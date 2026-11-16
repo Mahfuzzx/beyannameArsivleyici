@@ -1,0 +1,126 @@
+namespace GibEvrakIndirici.Core.Ebyn;
+
+/// <summary>
+/// e-Beyanname oturumuna istek taşıyan katman. TOKEN sayfada (getTOKEN/setTOKEN) tutulduğu için
+/// gerçek uygulama bunu WebView2 içinde çalıştırır; testler sahte bir taşıyıcı kullanır.
+/// </summary>
+public interface IEbynTasiyici
+{
+    /// <summary>POST /dispatch — gövdeye TOKEN eklenir, yanıttaki yeni TOKEN oturuma yazılır. Ham yanıtı döner.</summary>
+    Task<string> PostAsync(string parametreler, CancellationToken ct);
+
+    /// <summary>GET {goreliUrl}&amp;TOKEN=... — ham baytları döner.</summary>
+    Task<byte[]> GetAsync(string goreliUrl, CancellationToken ct);
+}
+
+public class EbynHatasi(string mesaj) : Exception(mesaj);
+
+/// <summary>e-Beyanname oturumu düştü (EYEKSERROR "Oturum zamanaşımına uğradı"). İndirme durur; yeniden giriş gerekir.</summary>
+public sealed class EbynOturumHatasi(string mesaj) : EbynHatasi(mesaj);
+
+/// <summary>
+/// GİB görüntüleme isteğine boş/PDF olmayan yanıt veriyor (kısa sürede çok istek sonrası görülen kısıtlama, §12.1).
+/// Bekleyip aynı evrakla devam edilir; sürerse indirme durdurulur.
+/// </summary>
+public sealed class EbynKisitlamaHatasi(string mesaj) : EbynHatasi(mesaj);
+
+/// <summary>
+/// Beyaz liste denetimi, hız sınırı (görüntülemeler arası ≥1 sn, §6), PDF doğrulama ve yeniden deneme.
+/// </summary>
+public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = null)
+{
+    readonly TimeProvider _zaman = zaman ?? TimeProvider.System;
+    DateTimeOffset _sonIstek = DateTimeOffset.MinValue;
+
+    public TimeSpan IstekAraligi { get; init; } = TimeSpan.FromMilliseconds(1500);
+    public int DenemeSayisi { get; init; } = 3;
+    /// <summary>İlk boş yanıttan sonra ikinci deneme öncesi bekleme.</summary>
+    public TimeSpan BosYanitBeklemesi { get; init; } = TimeSpan.FromSeconds(5);
+
+    async Task BekleAsync(CancellationToken ct)
+    {
+        var gecen = _zaman.GetUtcNow() - _sonIstek;
+        if (gecen < IstekAraligi) await Task.Delay(IstekAraligi - gecen, _zaman, ct);
+        _sonIstek = _zaman.GetUtcNow();
+    }
+
+    public async Task<EbynYanit> PostAsync(string parametreler, CancellationToken ct)
+    {
+        EbynKomutlari.Dogrula(parametreler);
+        await BekleAsync(ct);
+        var y = EbynYanit.Ayristir(await tasiyici.PostAsync(parametreler, ct));
+        if (y.OturumDustu) throw new EbynOturumHatasi("e-Beyanname oturumu zaman aşımına uğradı: " + y.Hata);
+        return y;
+    }
+
+    public async Task<byte[]> PdfAsync(string goreliUrl, CancellationToken ct)
+    {
+        EbynKomutlari.Dogrula(goreliUrl[(goreliUrl.IndexOf('?') + 1)..]);
+        string sonHata = "";
+        int bosYanit = 0;
+        for (int deneme = 1; deneme <= DenemeSayisi; deneme++)
+        {
+            await BekleAsync(ct);
+            var b = await tasiyici.GetAsync(goreliUrl, ct);
+            if (PdfMi(b)) return b;
+
+            var metin = System.Text.Encoding.UTF8.GetString(b);
+            var y = EbynYanit.Ayristir(metin);
+            if (y.OturumDustu) throw new EbynOturumHatasi("e-Beyanname oturumu zaman aşımına uğradı: " + y.Hata);
+            var aciklama = y.Hata.Length > 0 ? y.Hata : EbynAyristirici.Metin(y.Html);
+            if (aciklama.Length == 0)
+            {
+                // Boş yanıt: kısıtlama belirtisi. Sunucuyu yormamak için ikinci boş yanıtta vazgeç.
+                sonHata = $"GİB boş yanıt verdi ({b.Length} bayt)";
+                if (++bosYanit >= 2) throw new EbynKisitlamaHatasi("PDF alınamadı: " + sonHata);
+                await Task.Delay(BosYanitBeklemesi, _zaman, ct);
+                continue;
+            }
+            sonHata = aciklama.Length > 200 ? aciklama[..200] + "…" : aciklama;
+            await Task.Delay(TimeSpan.FromSeconds(deneme), _zaman, ct);
+        }
+        throw new EbynHatasi($"PDF alınamadı: {sonHata}");
+    }
+
+    public static bool PdfMi(byte[] b) => b.Length > 5 && b[0] == '%' && b[1] == 'P' && b[2] == 'D' && b[3] == 'F' && b[4] == '-';
+
+    /// <summary>Yükleme tarihi aralığındaki tüm onaylı beyannameler (aylık dilim + tüm sayfalar).</summary>
+    public async Task<List<BeyannameSatiri>> OnayliBeyannamelerAsync(DateTime bas, DateTime bit, IProgress<string>? ilerleme, CancellationToken ct)
+    {
+        var sonuc = new List<BeyannameSatiri>();
+        foreach (var (b, s) in EbynKomutlari.AylikDilimler(bas, bit))
+        {
+            int sayfa = 1, sayfaSayisi = 1;
+            do
+            {
+                ilerleme?.Report($"Listeleniyor: {b:dd.MM.yyyy}–{s:dd.MM.yyyy}, sayfa {sayfa}/{sayfaSayisi}");
+                var y = await PostAsync(EbynKomutlari.ListeYuklemeTarihi(b, s, sayfa), ct);
+                if (!y.Basarili)
+                {
+                    if (y.Hata.Contains("bulunamam", StringComparison.OrdinalIgnoreCase)) break;
+                    throw new EbynHatasi(y.Hata);
+                }
+                var l = EbynAyristirici.BeyannameListesi(y.Html);
+                sonuc.AddRange(l.Satirlar);
+                sayfaSayisi = l.SayfaSayisi;
+                sayfa++;
+            } while (sayfa <= sayfaSayisi);
+        }
+        // Aynı OID iki dilimde gelmesin
+        return sonuc.GroupBy(x => x.Oid).Select(g => g.First()).ToList();
+    }
+
+    public async Task<IReadOnlyList<IhbarnameBilgisi>> IhbarnamelerAsync(string beyannameOid, CancellationToken ct)
+    {
+        var y = await PostAsync(EbynKomutlari.Ihbarnameler(beyannameOid), ct);
+        if (!y.Basarili) throw new EbynHatasi(y.Hata);
+        return EbynAyristirici.Ihbarnameler(y.Html);
+    }
+
+    public async Task<IReadOnlyList<SgkBildirimi>> SgkBildirimleriAsync(string beyannameOid, CancellationToken ct)
+    {
+        var y = await PostAsync(EbynKomutlari.SgkBildirimleri(beyannameOid), ct);
+        if (!y.Basarili) throw new EbynHatasi(y.Hata);
+        return EbynAyristirici.SgkBildirimleri(y.Html, beyannameOid);
+    }
+}
