@@ -275,6 +275,19 @@ Luca'da tüm firmaların işyerlerini sicil no ile birlikte veren tek ekran YOK;
   tükenirse indirmeyi durdurur ("Eksikleri indir" kaldığı yerden sürer). EYEKSERROR → `EbynOturumHatasi`, indirme durur, yeniden giriş istenir.
 - Bu yüzden istek aralığını düşürmek (1500 → 1100 ms) **ertelendi**.
 
+### 12.2 Üçüncü tur: kota günlük görünüyor (2026-11-16 19:56–20:36)
+- Gün içi toplam başarılı indirme ve engel anları:
+  | Engel | O ana kadar toplam | Son 60 dk | Son 10 dk |
+  |---|---|---|---|
+  | 18:31 | 846 | 846 | 49 |
+  | 19:58 | 988 | 2 | 0 |
+  | 20:05 | 1056 | 68 | 68 |
+  | 20:08 | 1069 | 81 | 81 |
+  | 20:19 | 1187 | 199 | 118 |
+- 19:58'de son saatte neredeyse hiç istek yokken engel → hız/saatlik sınır değil; **günlük kota** (~850 görüntüleme, tahmin). Aşılınca arada 60–120 PDF'lik izin veriliyor.
+- Tur 2+5+10 dk beklemeden sonra durdu (199 indirildi, 1 hata). Günlük kullanımda yük küçük; sorun ilk yükleme / arşiv taraması.
+- Önerilen (uygulanmadı): günlük bütçe sayacı, en yeniden başlama, arşiv taramasını günlere yayma, engelde kısa kesme. Yarın kota sıfırlanıyor mu bakılacak.
+
 ## 13. e-Beyan (ebeyan.gib.gov.tr) incelemesi (2026-11-16)
 - Geçiş: DVD › Geçiş Yapılabilecek Uygulamalar › e-Beyan → onay penceresi ("aktif e-Beyan oturumları sonlandırılır") →
   `window.open("https://ebeyan.gib.gov.tr/dijital-login?token=…", "ebeyannmeprod")` → `POST /api/kullanici/dvd/login` → çerezli oturum (Next.js SPA).
