@@ -96,6 +96,8 @@ Bugün yapılanlar:
 - **Kopya olayı ve yeni kural (§9.6):** gerçek arşivde 16 kopya (8 düzeltme beyannamesi + tahakkukları) indi; kullanıcı onayıyla
   `_KOPYA` alt klasörlerine taşındı (silinmedi). Düzeltme sürümleri artık beyanname PDF'indeki **onay zamanıyla** tanınıyor
   (`Indirici.BeyannameEvraklariAsync`), tamamlanan satırlar "SATIR" anahtarıyla önbellekte. ~4 yıllık yükleme aralığını GİB kabul etti.
+- **Arşiv dizini (§9.7):** beyanname PDF'lerinin onay zamanı kalıcı önbellekte (`arsiv-dizini.json`); sürümler çoğu zaman GİB'e gitmeden
+  onay zamanı aralığıyla eşleşiyor, belirsizse GİB PDF'iyle birebir. Canlıda denenmedi. Sıradaki: arşiv sağlık raporu.
 - Durum çubuğuna ilerleme çubuğu eklendi (listeleme: ay dilimi; müşteri taraması: müşteri × tür; indirme: beyanname satırı; kalan süre tahmini).
 - Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).

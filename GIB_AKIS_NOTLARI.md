@@ -246,6 +246,18 @@ X:\{YIL}\{MÜKELLEF_KLASÖRÜ_TR}\{İŞYERİ}\{dosya}.pdf
   yazılır; sonraki çalıştırmalarda o satır için GİB'e hiç istek gitmez.
 - Tablodaki ✓/eksik gösterimi (`Indirici.Durum`) hâlâ önek sayımıyla (yalnız görüntü; indirme kararı yeni kuralla).
 
+### 9.7 Arşiv dizini ve GİB'e gitmeden sürüm eşleştirme (2026-11-18)
+- PDF içerikleri (gerçek dosyalarda bakıldı): beyanname PDF'i yalnız **onay zamanı**nı (saniyesiyle) taşır, yükleme zamanını taşımaz;
+  tahakkuk PDF'i yalnız tarihleri (onay günü, vade) ve tutarları; SGK PDF'leri sicil, yıl/ay, belge kabul tarihi, fiş no, destek primi.
+- **Dizin** (`ArsivDizini`, `%APPDATA%\GibEvrakIndirici\arsiv-dizini.json`): arşivdeki beyanname PDF'lerinin onay zamanı; her dosya bir kez okunur,
+  boyut/yazma zamanı değişirse yeniden. Ayrı bir tarama yok: bir klasör ilk kez işlendiğinde dolar (ilk geçiş yavaş, sonrası önbellekten).
+- **Aralık kuralı** (`Indirici.AraliktaEslesen`): bir sürümün onayı kendi yüklemesinden sonra, sonraki sürümün yüklemesinden önce olur →
+  arşivdeki dosyanın onay zamanı [yükleme − 1 dk, min(sonraki yükleme, yükleme + 1 gün)) aralığındaysa o sürümdür; GİB'den PDF istenmez.
+  Belirsiz (aday PDF okunamadı ya da sonraki sürüm < 2 saat sonra yüklendi) → GİB'den beyanname PDF'i alınıp onay zamanı birebir karşılaştırılır (§9.6).
+  Aralıkta aday yoksa sürüm eksik sayılır; PDF zaten indirileceği için birebir karşılaştırma da yapılır.
+- Sonraki sürümün yükleme zamanı aynı listedeki gruptan (`DuzeltmeSiralayici.SonrakiYuklemeler`) gelir; listede yoksa üst sınır yükleme + 1 gün.
+- Sağlık raporu (arşivdeki kopyalar, hiçbir GİB sürümüne uymayan dosyalar, eksik sürümler) sonraki aşama.
+
 ## 10. Eski program: Luca Entegrasyon (C:\LucaEntegrasyon) — inceleme
 - Java 11 masaüstü (Swing/SWT), `LucaEntegrasyon.jar` (Agem/Luca), başlatma `lucaentegrasyon.bat`.
 - Ayar: `LucaBeyanname.xml` → `filePath = \\SUNUCU\beyannameler\LUCA` (= Y:\), dönem seçimi, GİB ve Luca giriş bilgileri.

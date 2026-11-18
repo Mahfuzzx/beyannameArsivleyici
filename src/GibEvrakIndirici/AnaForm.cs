@@ -22,6 +22,7 @@ sealed class AnaForm : Form
     MusteriDeposu _musteriler = MusteriDeposu.Ac(Ayarlar.MusteriDosyasi);
     IsyeriDeposu _isyerleri = IsyeriDeposu.Ac(Ayarlar.IsyeriDosyasi);
     readonly TamamlananDeposu _tamamlanan = TamamlananDeposu.Ac(Ayarlar.TamamlananDosyasi);
+    readonly ArsivDizini _dizin = ArsivDizini.Ac(Ayarlar.ArsivDiziniDosyasi);
     List<BeyannameSatiri> _satirlar = [];
     readonly BindingList<SatirGorunumu> _gorunum = [];
     CancellationTokenSource? _iptal;
@@ -181,12 +182,12 @@ sealed class AnaForm : Form
     Indirici Indirici() => new(Istemci(), _musteriler, _isyerleri, _ayarlar,
         s => Task.FromResult(Diyaloglar.IsyeriSor(this, s)),
         () => _isyerleri.Kaydet(Ayarlar.IsyeriDosyasi),
-        tamamlanan: _tamamlanan);
+        tamamlanan: _tamamlanan, dizin: _dizin);
 
     /// <summary>İndirme bitince/kesilince tamamlanan listesini diske yazar.</summary>
     void TamamlananKaydet()
     {
-        try { _tamamlanan.Kaydet(Ayarlar.TamamlananDosyasi); }
+        try { _tamamlanan.Kaydet(Ayarlar.TamamlananDosyasi); _dizin.Kaydet(Ayarlar.ArsivDiziniDosyasi); }
         catch (Exception ex) { Log(Seviye.Uyari, "Tamamlanan listesi kaydedilemedi: " + ex.Message); }
     }
 

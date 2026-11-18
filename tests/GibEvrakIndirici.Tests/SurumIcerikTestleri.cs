@@ -32,6 +32,20 @@ public class SurumIcerikTestleri : IDisposable
         return null;
     }
 
+    /// <summary>Onay zamanları arasında en az <paramref name="ara"/> olan n gerçek PDF (sıralı).</summary>
+    static List<(byte[] Pdf, DateTime Onay)>? AraliklıGercekPdfler(int n, TimeSpan ara)
+    {
+        if (!Directory.Exists(@"D:\dev\y")) return null;
+        var l = new List<(byte[] Pdf, DateTime Onay)>();
+        foreach (var f in Directory.EnumerateFiles(@"D:\dev\y", "*_KDV1_BEYANNAME_*.pdf", SearchOption.AllDirectories).Take(400))
+        {
+            var b = File.ReadAllBytes(f);
+            if (BeyannamePdfOkuyucu.OnayZamani(b) is { } oz && l.All(x => (x.Onay - oz).Duration() >= ara)) l.Add((b, oz));
+            if (l.Count == n) return l.OrderBy(x => x.Onay).ToList();
+        }
+        return null;
+    }
+
     sealed class Tasiyici(Dictionary<string, byte[]> beyannameler) : IEbynTasiyici
     {
         public List<string> Getler { get; } = [];
@@ -85,6 +99,63 @@ public class SurumIcerikTestleri : IDisposable
         var ikinci = await ind.CalistirAsync(satirlar, new Progress<IndirmeOlayi>(), default);
         Assert.Equal(0, ikinci.Indirilen);
         Assert.Equal(once, t.Getler.Count);
+    }
+
+    /// <summary>Yükleme zamanları gerçekçiyse (onay = yükleme + birkaç dk) var olan sürümler için GİB'den beyanname PDF'i hiç istenmez.</summary>
+    [Fact]
+    public async Task AralikEslesmesiGibeGitmez()
+    {
+        var pdf = AraliklıGercekPdfler(3, TimeSpan.FromHours(3));
+        if (pdf is null) return;
+        var klasor = Path.Combine(_k, "ORNEK", "2024", "KDV1");
+        Directory.CreateDirectory(klasor);
+        File.WriteAllBytes(Path.Combine(klasor, "08_AGUSTOS_KDV1_BEYANNAME.pdf"), pdf[0].Pdf);
+        File.WriteAllBytes(Path.Combine(klasor, "08_AGUSTOS_KDV1_BEYANNAME_DÜZ.pdf"), pdf[2].Pdf);
+        File.WriteAllText(Path.Combine(klasor, "08_AGUSTOS_KDV1_TAHAKKUK.pdf"), "eski");
+        File.WriteAllText(Path.Combine(klasor, "08_AGUSTOS_KDV1_TAHAKKUK_DÜZ.pdf"), "eski");
+
+        var md = new MusteriDeposu();
+        md.Yukle([new() { KisaAd = "ORNEK", VergiNo = "1111111111" }]);
+        var t = new Tasiyici(new() { ["v1"] = pdf[0].Pdf, ["v2"] = pdf[1].Pdf, ["v3"] = pdf[2].Pdf });
+        var dizin = new ArsivDizini();
+        var ind = new Indirici(new EbynIstemci(t) { IstekAraligi = TimeSpan.Zero }, md, new IsyeriDeposu(),
+            new Ayarlar { YArsivKok = _k, XArsivKok = _k }, _ => Task.FromResult<string?>(null), dizin: dizin);
+        var satirlar = new[] { "v1", "v2", "v3" }.Select((oid, i) => new BeyannameSatiri
+        {
+            Oid = oid, Tur = "KDV1", VknTckn = "1111111111", Unvan = "ORNEK", TahakkukOid = "t" + oid,
+            Donem = Donem.Ayristir("08/2024-08/2024"), YuklemeZamani = pdf[i].Onay.AddMinutes(-7),
+        }).ToList();
+
+        var ozet = await ind.CalistirAsync(satirlar, new Progress<IndirmeOlayi>(), default);
+
+        Assert.Equal(2, ozet.Indirilen);                                         // yalnız v2 (beyanname + tahakkuk)
+        Assert.Equal(["v2"], t.Getler.Where(u => u.Contains("BEYANNAMEGORUNTULE")).Select(u => u[^2..]));
+        Assert.Equal(3, dizin.Sayi);                                             // arşivdeki 2 eski + yeni inen v2 (v3 karşılaştırılırken)
+        var dosya = Path.Combine(_k, "dizin.json");
+        dizin.Kaydet(dosya);
+        Assert.Equal(3, ArsivDizini.Ac(dosya).Sayi);
+    }
+
+    [Theory]
+    [InlineData(5, null, 0, true)]     // onay yüklemeden 5 dk sonra, sonraki sürüm yok → eşleşir
+    [InlineData(5, 300, 0, true)]      // sonraki sürüm 5 saat sonra → eşleşir
+    [InlineData(400, 300, 0, false)]   // onay sonraki sürümün yüklemesinden sonra → bu sürüm değil
+    [InlineData(-30, null, 0, false)]  // onay yüklemeden önce → önceki sürüm
+    [InlineData(5, 90, 1, false)]      // sonraki sürüm 1,5 saat sonra → belirsiz (GİB'e sorulur)
+    [InlineData(2000, null, 0, false)] // 1 günden uzun → eşleşmez
+    public void AralikKurali(int onayDk, int? sonrakiDk, int belirsizBeklenen, bool eslesirBeklenen)
+    {
+        var y = new DateTime(2024, 9, 26, 10, 0, 0);
+        var (es, belirsiz) = Indirici.AraliktaEslesen([("a", y.AddMinutes(onayDk))], y, sonrakiDk is { } s ? y.AddMinutes(s) : null);
+        Assert.Equal(belirsizBeklenen == 1, belirsiz);
+        Assert.Equal(eslesirBeklenen, es == "a");
+    }
+
+    [Fact]
+    public void OkunamayanAdayBelirsizdir()
+    {
+        var y = new DateTime(2024, 9, 26, 10, 0, 0);
+        Assert.True(Indirici.AraliktaEslesen([("a", y.AddMinutes(5)), ("b", null)], y, null).Belirsiz);
     }
 
     [Fact]

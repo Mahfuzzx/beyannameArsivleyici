@@ -37,10 +37,12 @@ public sealed class Indirici(
     Func<IsyeriSorusu, Task<string?>> isyeriSor,
     Action? isyerleriDegisti = null,
     Func<TimeSpan, CancellationToken, Task>? bekle = null,
-    TamamlananDeposu? tamamlanan = null)
+    TamamlananDeposu? tamamlanan = null,
+    ArsivDizini? dizin = null)
 {
     readonly Func<TimeSpan, CancellationToken, Task> _bekle = bekle ?? Task.Delay;
     readonly TamamlananDeposu _tamamlanan = tamamlanan ?? new();
+    readonly ArsivDizini _dizin = dizin ?? new();
 
     /// <summary>
     /// Pencere dışındaki eski asıl beyannameyi de hesaba katan düzeltme sırası: listedeki sıra ile arşivde bu satırdan
@@ -71,6 +73,7 @@ public sealed class Indirici(
         oran?.Report((0, satirlar.Count));
         var ozet = new IndirmeOzeti();
         var siralar = DuzeltmeSiralayici.Sirala(satirlar);
+        var sonrakiler = DuzeltmeSiralayici.SonrakiYuklemeler(satirlar);
 
         void Bildir(Seviye s, string msj, string? dosya = null)
         {
@@ -103,7 +106,7 @@ public sealed class Indirici(
                 try
                 {
                     // Var olan dosyalar atlandığı için aynı satırı yeniden denemek güvenlidir.
-                    var surum = await BeyannameEvraklariAsync(b, m, sira, Bildir, ct);
+                    var surum = await BeyannameEvraklariAsync(b, m, sira, sonrakiler.GetValueOrDefault(b.Oid), Bildir, ct);
                     if (b.IhbarnameVar) await IhbarnamelerAsync(b, m, sira, surum, Bildir, ct);
                     if (b.SgkBildirimVar) await SgkAsync(b, m, Bildir, ct);
                     // Satırın tüm evrakı arşivde → sonraki çalıştırmalarda hiç GİB isteği yapılmaz (PDF içerik karşılaştırması tekrarlanmaz)
@@ -147,20 +150,27 @@ public sealed class Indirici(
     /// </summary>
     sealed record SurumDurumu(DateTime Zaman, string? Eslesen, bool IcerikleYok);
 
-    readonly Dictionary<string, (DateTime Yazma, DateTime? Onay)> _arsivOnay = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Arşivdeki bir beyanname PDF'inin onay zamanı (kalıcı dizinden; okunamazsa null).</summary>
+    DateTime? ArsivOnay(string yol) => _dizin.BeyannameOnay(yol);
 
-    /// <summary>Arşivdeki bir beyanname PDF'inin onay zamanı (önbellekli; okunamazsa null).</summary>
-    DateTime? ArsivOnay(string yol)
+    /// <summary>Aynı sürüm grubunda iki yükleme bundan daha yakınsa onay zamanı aralığı güvenilmez → GİB PDF'iyle kesin karşılaştırma.</summary>
+    public static readonly TimeSpan YakinSurumPayi = TimeSpan.FromHours(2);
+    /// <summary>Onay, yüklemeden en çok bu kadar sonra gelir sayılır (sonraki sürüm listede yoksa aralığın üst sınırı).</summary>
+    public static readonly TimeSpan EnUzunOnaySuresi = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// GİB'e gitmeden eşleştirme (§9.7): bir sürümün onayı kendi yüklemesinden sonra, bir sonraki sürümün yüklemesinden önce olur.
+    /// Arşivdeki dosyalardan onay zamanı [yükleme, min(sonraki yükleme, yükleme + 1 gün)) aralığına düşen = bu sürüm.
+    /// Belirsiz: bir aday okunamadı ya da sonraki sürüm 2 saatten yakın yüklendi → çağıran GİB PDF'iyle kesin karşılaştırır.
+    /// </summary>
+    public static (string? Eslesen, bool Belirsiz) AraliktaEslesen(IReadOnlyList<(string Ad, DateTime? Onay)> adaylar, DateTime yukleme, DateTime? sonraki)
     {
-        try
-        {
-            var yazma = File.GetLastWriteTimeUtc(yol);
-            if (_arsivOnay.TryGetValue(yol, out var o) && o.Yazma == yazma) return o.Onay;
-            var oz = BeyannamePdfOkuyucu.OnayZamani(File.ReadAllBytes(yol));
-            _arsivOnay[yol] = (yazma, oz);
-            return oz;
-        }
-        catch (Exception) { return null; }
+        if (adaylar.Any(a => a.Onay is null)) return (null, true);
+        if (sonraki is { } s && s - yukleme < YakinSurumPayi) return (null, true);
+        var ust = sonraki is { } s2 && s2 < yukleme + EnUzunOnaySuresi ? s2 : yukleme + EnUzunOnaySuresi;
+        // GİB listesindeki yükleme dakikası ile PDF'teki onay saniyesi arasında küçük saat farkı olabilir → 1 dk alt pay
+        var es = adaylar.Where(a => a.Onay >= yukleme.AddMinutes(-1) && a.Onay < ust).OrderBy(a => a.Onay).FirstOrDefault();
+        return (es.Ad, false);
     }
 
     /// <summary>"..._BEYANNAME_X" → "..._TAHAKKUK_X" (arşivdeki eşin tahakkuk/ihbarname karşılığı).</summary>
@@ -173,7 +183,8 @@ public sealed class Indirici(
     /// Arşivde aynı önekli dosya varsa sürüm PDF içeriğiyle (onay zamanı) tanınır: ofisin elle verdiği adlar
     /// (_DÜZ, _DÜZ2, damgasız, XML adlı) GİB'deki sıra numarasıyla örtüşmeyebilir (2026-11-18'de 8 kopya buradan çıktı).
     /// </summary>
-    async Task<SurumDurumu> BeyannameEvraklariAsync(BeyannameSatiri b, Musteri m, int sira, Action<Seviye, string, string?> bildir, CancellationToken ct)
+    async Task<SurumDurumu> BeyannameEvraklariAsync(BeyannameSatiri b, Musteri m, int sira, DateTime? sonrakiYukleme,
+        Action<Seviye, string, string?> bildir, CancellationToken ct)
     {
         var klasor = ArsivDenetci.BeyannameKlasoru(ayarlar.YArsivKok, m, b);
         var bOnek = DosyaAdlari.BeyannameOnek(b, EvrakTuru.Beyanname);
@@ -188,8 +199,28 @@ public sealed class Indirici(
         bool icerikleYok = false;
         bool onayOkundu = false;
 
-        // Tam ad yoksa ve (arşivde aday var ya da ad onay zamanına bağlıysa) GİB'deki beyanname PDF'i alınır
-        if (!tamAd && (adaylar.Count > 0 || onayli))
+        // 1) GİB'e gitmeden: arşivdeki PDF'lerin onay zamanı bu sürümün aralığına düşüyor mu? (§9.7)
+        bool gibGerekli = !tamAd && (adaylar.Count > 0 || onayli);
+        if (!tamAd && adaylar.Count > 0)
+        {
+            var okunan = adaylar.Select(a => (Ad: a, Onay: ArsivOnay(Path.Combine(klasor, a + ".pdf")))).ToList();
+            var (es, belirsiz) = AraliktaEslesen(okunan, b.YuklemeZamani, sonrakiYukleme);
+            if (!belirsiz && es is not null)
+            {
+                eslesen = es;
+                onayOkundu = true;
+                if (onayli && okunan.First(x => x.Ad == es).Onay is { } esOnay) zaman = esOnay;
+                gibGerekli = false;                                  // sürüm var; GİB'den PDF istenmez
+            }
+            else if (!belirsiz)
+            {
+                icerikleYok = true;                                  // sürüm eksik; PDF zaten indirilecek
+                gibGerekli = true;
+            }
+        }
+
+        // 2) Belirsizse ya da indirilecekse GİB'deki beyanname PDF'i alınır (onay zamanı + kesin karşılaştırma)
+        if (gibGerekli)
         {
             bynPdf = await istemci.PdfAsync(EbynKomutlari.BeyannamePdf(b.Oid), ct);
             if (BeyannamePdfOkuyucu.OnayZamani(bynPdf) is { } oz)

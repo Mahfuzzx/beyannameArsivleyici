@@ -91,4 +91,14 @@ public static class DuzeltmeSiralayici
         satirlar.GroupBy(s => (s.VknTckn, s.Tur, s.Donem))
                 .SelectMany(g => g.OrderBy(s => s.YuklemeZamani).Select((s, i) => (s.Oid, i)))
                 .ToDictionary(x => x.Oid, x => x.i);
+
+    /// <summary>Her satır için aynı mükellef + tür + dönemdeki bir sonraki sürümün yükleme zamanı (son sürümde yok).</summary>
+    public static Dictionary<string, DateTime?> SonrakiYuklemeler(IEnumerable<BeyannameSatiri> satirlar) =>
+        satirlar.GroupBy(s => (s.VknTckn, s.Tur, s.Donem))
+                .SelectMany(g =>
+                {
+                    var l = g.OrderBy(s => s.YuklemeZamani).ToList();
+                    return l.Select((s, i) => (s.Oid, Sonraki: i + 1 < l.Count ? l[i + 1].YuklemeZamani : (DateTime?)null));
+                })
+                .GroupBy(x => x.Oid).ToDictionary(g => g.Key, g => g.First().Sonraki);
 }
