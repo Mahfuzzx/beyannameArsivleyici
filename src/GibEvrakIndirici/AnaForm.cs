@@ -23,6 +23,7 @@ sealed class AnaForm : Form
     IsyeriDeposu _isyerleri = IsyeriDeposu.Ac(Ayarlar.IsyeriDosyasi);
     readonly TamamlananDeposu _tamamlanan = TamamlananDeposu.Ac(Ayarlar.TamamlananDosyasi);
     readonly ArsivDizini _dizin = ArsivDizini.Ac(Ayarlar.ArsivDiziniDosyasi);
+    readonly IstekSayaci _sayac = new(Ayarlar.IstekSayaciKlasoru);
     List<BeyannameSatiri> _satirlar = [];
     readonly BindingList<SatirGorunumu> _gorunum = [];
     CancellationTokenSource? _iptal;
@@ -184,7 +185,7 @@ sealed class AnaForm : Form
 
     // ---------------- işlemler ----------------
 
-    EbynIstemci Istemci() => new(_gib) { IstekAraligi = TimeSpan.FromMilliseconds(Math.Max(1000, _ayarlar.IstekAraligiMs)) };
+    EbynIstemci Istemci() => new(_gib) { IstekAraligi = TimeSpan.FromMilliseconds(Math.Max(1000, _ayarlar.IstekAraligiMs)), Sayac = _sayac };
 
     Indirici Indirici() => new(Istemci(), _musteriler, _isyerleri, _ayarlar,
         s => Task.FromResult(Diyaloglar.IsyeriSor(this, s)),
@@ -204,6 +205,7 @@ sealed class AnaForm : Form
         _iptal = new CancellationTokenSource();
         foreach (var b in _isDugmeleri) b.Enabled = false;
         _durdur.Enabled = true;
+        var oncekiIstek = _sayac.ProgramToplami;
         try { await is_(_iptal.Token); }
         catch (OperationCanceledException) { Log(Seviye.Uyari, $"{ad} durduruldu."); }
         catch (EbynOturumHatasi ex)
@@ -222,6 +224,7 @@ sealed class AnaForm : Form
         catch (Exception ex) { Log(Seviye.Hata, $"{ad}: {ex.Message}"); }
         finally
         {
+            if (_sayac.ProgramToplami != oncekiIstek) Log(Seviye.Bilgi, _sayac.Metin());
             TamamlananKaydet();
             IlerlemeyiGizle();
             _iptal.Dispose(); _iptal = null;

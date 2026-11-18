@@ -405,6 +405,19 @@ Luca'da tüm firmaların işyerlerini sicil no ile birlikte veren tek ekran YOK;
   5 düzeltme: 2024 Mayıs KDV1 `_DÜZ` (beyanname, tahakkuk, ihbarname; arşivde yalnız asıl vardı) ve 2026 Eylül KDV1 `_DÜZ2`.
   **Düzeltme (aynı gün, §9.6):** Eylül `_DÜZ2` aslında KOPYA çıktı — arşivdeki elle `_DÜZ` dosyası GİB'deki 3. sürümün kendisiydi.
 
+### 12.5 Kota türü: log analizi ve istek sayacı (2026-11-18)
+- İnternette (GİB e-Beyan belgeleri, entegrasyon kılavuzu, toplu indirme programlarının tanıtımları, forumlar) görüntüleme/indirme
+  sınırına dair bilgi bulunamadı. Bilinen GİB sınırları gönderim tarafında (pakette 5 beyanname, MUHSGK satır kotası).
+- Log'lardaki "İndirildi" satırlarına göre (karşılaştırma için alınan PDF'ler sayılmadı):
+  - 16.11: 17:36'dan itibaren 60 dk'da 923 PDF, engel yok; ilk engel ~850'de. 19:56'da, önceki 54 dk'da hiç istek yokken yine engel.
+    Sonra arada 60–120 PDF geçti; gün toplamı 1187.
+  - 18.11: 09:30'dan itibaren 10 dk'da 364 PDF, engel yok; ilk engel 11:30'da gün toplamı 895 iken. Sonra 5 kısa engel arasında ~100 PDF;
+    16:16'da (son 60 dk'da yalnız 55) tek engel, ardından 84 PDF daha. Gün toplamı 1094.
+  - Yorum: **saatlik değil**; gün içinde ~850–900'den sonra kesin duvar değil, aralıklı boş yanıt (fren). Takvim günü mü kayan 24 saat mi, bilinmiyor.
+- `IstekSayaci` (`%APPDATA%\GibEvrakIndirici\istekler\yyyy-MM-dd.txt`, satır: `HH:mm:ss P|B|H`): `EbynIstemci.PdfAsync`'in her GET'i
+  (indirme + sürüm karşılaştırması) sayılır. Kısıtlama hatası ve her işin sonu log'a "GİB PDF isteği — bugün N (boş yanıt B), son 60 dk M,
+  son 24 saat K" yazar. Yalnız bu bilgisayarı görür; diğer birim aynı kotayı kullanır. Birkaç günlük veriyle bütçe belirlenecek.
+
 ## 13. e-Beyan (ebeyan.gib.gov.tr) incelemesi (2026-11-16)
 - Geçiş: DVD › Geçiş Yapılabilecek Uygulamalar › e-Beyan → onay penceresi ("aktif e-Beyan oturumları sonlandırılır") →
   `window.open("https://ebeyan.gib.gov.tr/dijital-login?token=…", "ebeyannmeprod")` → `POST /api/kullanici/dvd/login` → çerezli oturum (Next.js SPA).

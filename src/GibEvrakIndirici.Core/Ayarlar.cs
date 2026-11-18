@@ -90,6 +90,8 @@ public sealed class Ayarlar
     public static string LogKlasoru => Path.Combine(VeriKlasoru, "log");
     /// <summary>Arşiv ad düzeltmelerinin geri alma günlükleri (§9.8).</summary>
     public static string AdDuzeltmeKlasoru => Path.Combine(VeriKlasoru, "ad-duzeltme");
+    /// <summary>GİB PDF isteği sayacı (günlük dosyalar, §12.5).</summary>
+    public static string IstekSayaciKlasoru => Path.Combine(VeriKlasoru, "istekler");
 
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 

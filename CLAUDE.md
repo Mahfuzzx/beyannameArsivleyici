@@ -101,6 +101,9 @@ Bugün yapılanlar:
   onay zamanı aralığıyla eşleşiyor, belirsizse GİB PDF'iyle birebir. Canlıda denenmedi. Sıradaki: arşiv sağlık raporu.
 - Durum çubuğuna ilerleme çubuğu eklendi (listeleme: ay dilimi; müşteri taraması: müşteri × tür; indirme: beyanname satırı; kalan süre tahmini).
 - Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
+- **Kota ölçümü (§12.5):** engel saatlik değil; ~850–900/gün sonrası aralıklı boş yanıt. İnternette bilgi yok. `IstekSayaci` her PDF isteğini
+  `istekler\yyyy-MM-dd.txt`'ye yazar, kısıtlamada ve iş sonunda özet log'lanır. Birkaç gün veri toplanınca bütçe kararı verilecek.
+- Luca'dan işyeri aktarımı kullanıcı tarafından canlı denendi, çalışıyor.
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).
 - **Ad düzeltme (§9.8):** Müşteri taraması › "Adları düzelt…": eski/önekli adlar PDF içeriği (onay zamanı, dönem, kabul) + GİB listesiyle
   standart ada; kullanıcı onaylar, `ad-duzeltme\*.tsv` geri alma günlüğü, "Düzeltmeyi geri al…". ÖD/OD, MAHSUP, ihbarname dokunulmaz;
@@ -114,6 +117,5 @@ Bugün yapılanlar:
 - Gerçek arşive geçiş denetimi yapıldı (§9.4): müşteri klasörleri ve Y:\ evrakları tanınıyor. X:\ SGK adlarının birebir karşılaştırması
   hâlâ yapılamadı (bu birimin test indirmesindeki SGK dönemleri arşivde yok); geçişte ilk turun log'u izlenmeli.
 - Test klasöründe (D:\dev\x) eski kuralla yanlış adlanmış 10 SGDP dosyası var (`01_00000` olmalıydı `02_00000`); gerçek arşivi etkilemez.
-- Luca'dan işyeri aktarımı uygulamada canlı denenmedi.
 - Test indirmesinde bir müşterinin işyeri klasörü müşteri adıyla aynı çıktı (`{yıl}\{müşteri}\{müşteri}`) — kaynağı (X arşivinden öğrenme?) incelenmeli.
 - Gerçek arşive (Y:\, X:\) geçmeden önce ayarlardaki test klasörleri geri alınmalı.

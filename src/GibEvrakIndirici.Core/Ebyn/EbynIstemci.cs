@@ -36,6 +36,8 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
     public int DenemeSayisi { get; init; } = 3;
     /// <summary>İlk boş yanıttan sonra ikinci deneme öncesi bekleme.</summary>
     public TimeSpan BosYanitBeklemesi { get; init; } = TimeSpan.FromSeconds(5);
+    /// <summary>Her PDF isteğini kalıcı olarak sayar (kota ölçümü, §12.5).</summary>
+    public IstekSayaci? Sayac { get; init; }
 
     async Task BekleAsync(CancellationToken ct)
     {
@@ -62,17 +64,19 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
         {
             await BekleAsync(ct);
             var b = await tasiyici.GetAsync(goreliUrl, ct);
-            if (PdfMi(b)) return b;
+            if (PdfMi(b)) { Sayac?.Kaydet(IstekSonucu.Pdf); return b; }
 
             var metin = System.Text.Encoding.UTF8.GetString(b);
             var y = EbynYanit.Ayristir(metin);
             if (y.OturumDustu) throw new EbynOturumHatasi("e-Beyanname oturumu zaman aşımına uğradı: " + y.Hata);
             var aciklama = y.Hata.Length > 0 ? y.Hata : EbynAyristirici.Metin(y.Html);
+            Sayac?.Kaydet(aciklama.Length == 0 ? IstekSonucu.Bos : IstekSonucu.Hata);
             if (aciklama.Length == 0)
             {
                 // Boş yanıt: kısıtlama belirtisi. Sunucuyu yormamak için ikinci boş yanıtta vazgeç.
                 sonHata = $"GİB boş yanıt verdi ({b.Length} bayt)";
-                if (++bosYanit >= 2) throw new EbynKisitlamaHatasi("PDF alınamadı: " + sonHata);
+                if (++bosYanit >= 2)
+                    throw new EbynKisitlamaHatasi("PDF alınamadı: " + sonHata + (Sayac is null ? "" : $" [{Sayac.Metin()}]"));
                 await Task.Delay(BosYanitBeklemesi, _zaman, ct);
                 continue;
             }
