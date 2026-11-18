@@ -30,7 +30,19 @@ public sealed class EbynKisitlamaHatasi(string mesaj) : EbynHatasi(mesaj);
 public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = null)
 {
     readonly TimeProvider _zaman = zaman ?? TimeProvider.System;
-    DateTimeOffset _sonIstek = DateTimeOffset.MinValue;
+
+    // Son isteğin bitiş zamanı aynı oturumu (taşıyıcıyı) kullanan tüm istemcilerde ortak: her iş yeni bir istemci kurar,
+    // GİB ise oturum başına sayar. Süre yanıtın gelişinden ölçülür: uzun süren liste sorgusundan hemen sonra gönderilen istek
+    // "İki istek arası en az 1 sn olabilir" hatası alıyordu (§12.3).
+    sealed class Saat { public DateTimeOffset Son = DateTimeOffset.MinValue; }
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IEbynTasiyici, Saat> Saatler = new();
+    readonly Saat _saat = Saatler.GetValue(tasiyici, _ => new Saat());
+    DateTimeOffset _sonIstek { get => _saat.Son; set => _saat.Son = value; }
+
+    /// <summary>"İki istek arası en az 1 sn" yanıtında kaç kez beklenip yeniden denenir.</summary>
+    public int AralikHatasiDenemesi { get; init; } = 3;
+
+    static bool AralikHatasi(string metin) => metin.Contains("en az 1 sn", StringComparison.OrdinalIgnoreCase);
 
     public TimeSpan IstekAraligi { get; init; } = TimeSpan.FromMilliseconds(1500);
     public int DenemeSayisi { get; init; } = 3;
@@ -49,10 +61,21 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
     public async Task<EbynYanit> PostAsync(string parametreler, CancellationToken ct)
     {
         EbynKomutlari.Dogrula(parametreler);
-        await BekleAsync(ct);
-        var y = EbynYanit.Ayristir(await tasiyici.PostAsync(parametreler, ct));
-        if (y.OturumDustu) throw new EbynOturumHatasi("e-Beyanname oturumu zaman aşımına uğradı: " + y.Hata);
-        return y;
+        for (int deneme = 0; ; deneme++)
+        {
+            await BekleAsync(ct);
+            string ham;
+            try { ham = await tasiyici.PostAsync(parametreler, ct); }
+            finally { _sonIstek = _zaman.GetUtcNow(); }
+            var y = EbynYanit.Ayristir(ham);
+            if (y.OturumDustu) throw new EbynOturumHatasi("e-Beyanname oturumu zaman aşımına uğradı: " + y.Hata);
+            if (!y.Basarili && AralikHatasi(y.Hata) && deneme < AralikHatasiDenemesi)
+            {
+                await Task.Delay(IstekAraligi, _zaman, ct);
+                continue;
+            }
+            return y;
+        }
     }
 
     public async Task<byte[]> PdfAsync(string goreliUrl, CancellationToken ct)
@@ -63,7 +86,9 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
         for (int deneme = 1; deneme <= DenemeSayisi; deneme++)
         {
             await BekleAsync(ct);
-            var b = await tasiyici.GetAsync(goreliUrl, ct);
+            byte[] b;
+            try { b = await tasiyici.GetAsync(goreliUrl, ct); }
+            finally { _sonIstek = _zaman.GetUtcNow(); }
             if (PdfMi(b)) { Sayac?.Kaydet(IstekSonucu.Pdf); return b; }
 
             var metin = System.Text.Encoding.UTF8.GetString(b);

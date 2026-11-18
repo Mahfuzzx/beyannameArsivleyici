@@ -396,6 +396,9 @@ Luca'da tüm firmaların işyerlerini sicil no ile birlikte veren tek ekran YOK;
   elle verilmiş tarihli/damgasız adlar → gerçek arşivde "var" sayılır). Ekim MUHSGK + SGK arşivde henüz yok.
 - SGK bildirim listesinde MUHSGK'nın vergi kısmı "Vergi" satırı olarak geliyor, PDF'i hiç olmaz → 70 gereksiz uyarı; artık sessizce atlanıyor.
 - Liste (POST) isteklerinde de "İki istek arası en az 1 sn olabilir" hatası görüldü → 1 sn kuralı yalnız görüntülemede değil; bekleme tüm isteklerde kalmalı.
+  2026-11-18 akşam: uzun aralıklı müşteri listesi (ad düzeltme taraması) yine bu hatayla durdu. Aralık isteğin gönderilişinden sayılıyordu;
+  yavaş yanıttan hemen sonra yeni istek gidiyordu. Artık aralık **yanıtın bitişinden** sayılır, aynı oturumdaki tüm istemcilerde ortaktır
+  (her iş yeni `EbynIstemci` kurar) ve bu hata gelirse bekleyip 3 kez yeniden denenir.
 - Aynı gün toplam **890 PDF** (09:26 471 + 10:55 262 + 11:10 157) hiç kısıtlama olmadan indi → "~850/gün" tahmini **tutmadı**.
   16.11'deki engel 846. indirmede gelmişti ama o gün öncesinde keşif amaçlı elle çok sayıda görüntüleme de yapılmıştı. Sınır bilinmiyor (≥890/gün).
 
