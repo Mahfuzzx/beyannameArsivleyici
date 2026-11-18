@@ -38,10 +38,22 @@ public sealed class Indirici(
 {
     readonly Func<TimeSpan, CancellationToken, Task> _bekle = bekle ?? Task.Delay;
 
+    /// <summary>
+    /// Pencere dışındaki eski asıl beyannameyi de hesaba katan düzeltme sırası: listedeki sıra ile arşivde bu satırdan
+    /// önce yüklenmiş (adındaki damga en az 10 dk eski) beyanname dosyası sayısının büyüğü (§9.2).
+    /// </summary>
+    public int EtkinSira(BeyannameSatiri b, Musteri m, int listeSira)
+    {
+        var k = ArsivDenetci.BeyannameKlasoru(ayarlar.YArsivKok, m, b);
+        var arsivde = ArsivDenetci.OncekiYuklemeSayisi(k, DosyaAdlari.BeyannameOnek(b, EvrakTuru.Beyanname), b.YuklemeZamani.AddMinutes(-10));
+        return Math.Max(listeSira, arsivde);
+    }
+
     public SatirDurumu Durum(BeyannameSatiri b, int duzeltmeSira)
     {
         var m = musteriler.Bul(b.VknTckn);
         if (m is null) return new SatirDurumu(null, null, null, duzeltmeSira);
+        duzeltmeSira = EtkinSira(b, m, duzeltmeSira);
         var k = ArsivDenetci.BeyannameKlasoru(ayarlar.YArsivKok, m, b);
         bool Var(EvrakTuru e) => ArsivDenetci.VarMi(k, DosyaAdlari.BeyannameOnek(b, e), DosyaAdlari.BeyannameDosyasi(b, e, duzeltmeSira), duzeltmeSira);
         return new SatirDurumu(m, Var(EvrakTuru.Beyanname), b.TahakkukOid is null ? null : Var(EvrakTuru.Tahakkuk), duzeltmeSira);
@@ -73,7 +85,7 @@ public sealed class Indirici(
                 Bildir(Seviye.Uyari, $"{b.VknTckn} {b.Unvan}: müşteri listesinde yok, atlandı");
                 continue;
             }
-            int sira = siralar.GetValueOrDefault(b.Oid);
+            int sira = EtkinSira(b, m, siralar.GetValueOrDefault(b.Oid));
             for (int kisitlama = 0; ; kisitlama++)
             {
                 try
@@ -169,6 +181,8 @@ public sealed class Indirici(
         {
             if (!s.PdfVar)
             {
+                // MUHSGK'nın vergi kısmı da bu listede "Vergi" satırı olarak gelir; SGK PDF'i hiç olmaz → uyarı gereksiz.
+                if (s.Aciklama.Trim().StartsWith("Vergi", StringComparison.OrdinalIgnoreCase)) continue;
                 bildir(Seviye.Uyari, $"{m.KisaAd} {b.Donem}: SGK bildirimi PDF'siz (hatalı/işlemde) — {s.Aciklama}", null);
                 continue;
             }

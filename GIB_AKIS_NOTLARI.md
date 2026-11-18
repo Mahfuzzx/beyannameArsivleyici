@@ -176,6 +176,12 @@ X:\{YIL}\{MÜKELLEF_KLASÖRÜ_TR}\{İŞYERİ}\{dosya}.pdf
   1. yükleme = normal ad, 2. = `_DÜZ`, 3. = `_DÜZ2`, 4. = `_DÜZ3` … (kullanıcı kararı)
   Örnek: `01_OCAK_KDV1_BEYANNAME_18.02.2026_12_59_29_DÜZ.pdf` — ek, zaman damgasından sonra, `.pdf`'ten önce.
   (Arşivdeki eski elle verilmiş adlarda damga yok: `01_OCAK_KDV1_BEYANNAME_DÜZ.pdf` → var-mı kontrolünde bu da tanınmalı.)
+- **Pencere dışı asıl (2026-11-18 bulundu, düzeltildi):** Liste son 31 günü gösterdiği için eski bir dönemin bu ay verilen düzeltmesi tek satır
+  görünür → sıra 0 sanılır → arşivdeki eski asıl dosya yüzünden "zaten var" denip **hiç indirilmezdi**.
+  Çözüm `Indirici.EtkinSira`: sıra = max(liste sırası, arşivde adındaki damgası bu satırın yüklemesinden ≥10 dk eski beyanname dosyası sayısı)
+  (`ArsivDenetci.OncekiYuklemeSayisi`; `dd.MM.yyyy_HH_mm_ss`, `yyyyMMddHHmmss`, yalnız tarih `dd.MM.yyyy` = gün olarak; damgasız sayılmaz).
+  Gerçek arşivde denendi: 149 beyannameden 2'si düzeltme sayıldı, ikisi de gerçek (2024 KDV1 düzeltmesi + 2020 KURUMLAR); yanlış pozitif yok.
+  2020 KURUMLAR'da ofis düzeltmeyi elle `_DÜZELTME.pdf` adıyla kaydetmiş → önek sayımıyla "var", yeniden indirilmez.
 
 ### 9.3 SGK işyeri klasörü — PDF'ten öğrenme
 - İşyeri adları Luca'dan geliyor, dışa aktarılamıyor.
@@ -287,6 +293,13 @@ Luca'da tüm firmaların işyerlerini sicil no ile birlikte veren tek ekran YOK;
 - 19:58'de son saatte neredeyse hiç istek yokken engel → hız/saatlik sınır değil; **günlük kota** (~850 görüntüleme, tahmin). Aşılınca arada 60–120 PDF'lik izin veriliyor.
 - Tur 2+5+10 dk beklemeden sonra durdu (199 indirildi, 1 hata). Günlük kullanımda yük küçük; sorun ilk yükleme / arşiv taraması.
 - Önerilen (uygulanmadı): günlük bütçe sayacı, en yeniden başlama, arşiv taramasını günlere yayma, engelde kısa kesme. Yarın kota sıfırlanıyor mu bakılacak.
+
+### 12.3 Dördüncü tur (2026-11-18 09:26–09:40)
+- 18.10–18.11 aralığı: 362 onaylı beyanname → **471 indirildi, 384 zaten var, 0 hata, hiç kısıtlama yok** → kota günlük sıfırlanıyor (tahmin destekleniyor; 850 sınırına ulaşılmadı).
+- Gerçek arşivle (Y:\, X:\) karşılaştırma: arşivde karşılığı olan 228 dosyanın 214'ü birebir; 14 farklı ad (eski programın birkaç sn farklı saati,
+  elle verilmiş tarihli/damgasız adlar → gerçek arşivde "var" sayılır). Ekim MUHSGK + SGK arşivde henüz yok.
+- SGK bildirim listesinde MUHSGK'nın vergi kısmı "Vergi" satırı olarak geliyor, PDF'i hiç olmaz → 70 gereksiz uyarı; artık sessizce atlanıyor.
+- Liste (POST) isteklerinde de "İki istek arası en az 1 sn olabilir" hatası görüldü → 1 sn kuralı yalnız görüntülemede değil; bekleme tüm isteklerde kalmalı.
 
 ## 13. e-Beyan (ebeyan.gib.gov.tr) incelemesi (2026-11-16)
 - Geçiş: DVD › Geçiş Yapılabilecek Uygulamalar › e-Beyan → onay penceresi ("aktif e-Beyan oturumları sonlandırılır") →

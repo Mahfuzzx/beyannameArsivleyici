@@ -69,6 +69,13 @@ Bugün yapılanlar:
    - Sonra değerlendirilebilir: KDV için e-Beyan (ayrı kota olabilir, bilinmiyor), resmi e-Beyan API'si (başvuru gerekir, PDF listesi doğrulanmadı).
 3. Ertelenen: istek aralığını 1500 → 1100 ms düşürme (kota bulgusu nedeniyle anlamsız).
 
+## Durum — 2026-11-18
+- 4. tur: 471 indirildi, 0 hata, kısıtlama yok → **kota günlük sıfırlanıyor** (§12.3). Gerçek arşivle 228 dosyanın 214'ü birebir.
+- Düzeltildi: pencere dışı asıl beyannamesi olan düzeltmeler artık `_DÜZ` olarak indiriliyor (`Indirici.EtkinSira`, §9.2) —
+  önceden "zaten var" sanılıp kaçırılıyordu. SGK listesindeki "Vergi" satırı uyarısı kaldırıldı. 1 sn kuralı POST'ta da var (§12.3).
+- Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
+- `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).
+
 ### Açık işler
 - X (SGK) arşiviyle karşılaştırma yapılmadı (Ekim SGK'ları arşivde yoktu; ağ sürücüsü de bağlantısızdı) — Eylül ile denenmeli.
 - SGK belge türü eşlemesi (01/02) gerçek verilerle doğrulanmadı.
