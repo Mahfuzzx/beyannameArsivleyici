@@ -217,7 +217,20 @@ public sealed class Indirici(
             }
 
             var thkPdf = await istemci.PdfAsync(EbynKomutlari.SgkTahakkukPdf(s), ct);
-            var sicil = SgkPdfOkuyucu.SicilOku(thkPdf);
+            var (sicil, pdfBt) = SgkPdfOkuyucu.Oku(thkPdf);
+            if (pdfBt != bt)
+            {
+                // Belge türü açıklamadan güvenilir çıkmıyor (SGDP = 02); tahakkuk PDF'i esas (§9.4). Açıklama ileride kural için loglanır.
+                bildir(Seviye.Bilgi, $"{m.KisaAd} {b.Donem} SGK: belge türü PDF'ten {pdfBt} (açıklamadan {bt}) — {s.Aciklama}", null);
+                bt = pdfBt;
+                tOnek = DosyaAdlari.SgkOnek(b.Donem, bt, kn, mh, EvrakTuru.SgkTahakkuk);
+                hOnek = DosyaAdlari.SgkOnek(b.Donem, bt, kn, mh, EvrakTuru.SgkHizmetListesi);
+                if (HerYerdeVar(tOnek) && HerYerdeVar(hOnek))
+                {
+                    bildir(Seviye.Atlandi, $"{m.KisaAd} {b.Donem} SGK {bt}/{kn}: zaten var", null);
+                    continue;
+                }
+            }
             var isyeri = sicil is null ? null : await IsyeriBulAsync(m, sicil);
             if (isyeri is null)
             {

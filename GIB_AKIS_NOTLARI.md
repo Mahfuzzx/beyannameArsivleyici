@@ -193,6 +193,22 @@ X:\{YIL}\{MÜKELLEF_KLASÖRÜ_TR}\{İŞYERİ}\{dosya}.pdf
 - Bilinmeyen sicil: müşterinin tek işyeri varsa / hiç yoksa `MERKEZ`; aksi halde bir kez sorulur ve hatırlanır.
 - .NET tarafında PDF metni için kütüphane: UglyToad.PdfPig.
 
+### 9.4 Gerçek arşive bağlanınca eski dosyalar tanınıyor mu? (2026-11-18 denetimi)
+- **Müşteri klasörleri:** bu birimin 129 müşterisinden 80'inin Y:\ klasörü kuraldan bulunuyor; kalan 49'un arşivde hiç klasörü yok
+  (program aynı kuralla açar). Y:\'de hiçbir müşteriye uymayan 3 klasör var (1 tür klasörü + 2 listede olmayan eski müşteri);
+  hiçbir müşterinin klasörü başka adla durmuyor. X:\ son 3 yıl: uymayan klasör yok.
+- **Beyanname/tahakkuk/ihbarname (Y):** test indirmesindeki bu birime ait dosyaların arşivde karşılığı olanların hepsi önek sayımıyla tanınıyor
+  (KDV1 104, GGECICI 78, KGECICI 28, KDV2 14, KDV4 2, KURUMLAR 2). Tanınmayanlar gerçekten yeni: Ekim MUHSGK (72, eski program henüz indirmemiş)
+  ve 2024 KDV1 düzeltmesinin ihbarnamesi.
+- **SGK belge türü HATASI bulundu ve düzeltildi:** arşivde `02_00000_…` (2026'da 204, 2025'te 285 dosya) = **SGDP** (sosyal güvenlik destek primi,
+  emekli çalışan). Program belge türünü e-Beyanname bildirim açıklamasından tahmin ediyordu ("DESTEK"/"SGDP" arıyordu) → bizim 13 `01_00000`
+  dosyanın 10'u aslında 02 idi. Gerçek arşivde eski programın 02 dosyaları tanınmayacak, yanlış adla kopya inecekti.
+  Çözüm: belge türü **tahakkuk PDF'inden** (`SgkPdfOkuyucu.Oku`): metinde boşluksuz "DESTEKPR"/"SGDP" → 02, yoksa 01.
+  Arşivde doğrulandı: gerçek SGK tahakkuklarında 1135/1135 (2026: 453, 2025: 682) uyuşuyor; uyuşmayan 11 dosya elle konmuş `_MAHSUP`
+  (KDV iade dilekçesi). Hizmet listesi PDF'inde bu ifade yok → karar tahakkuktan verilir, hizmet listesi aynı adı alır.
+  Akış: açıklamaya göre "var mı" bakılır → yoksa tahakkuk indirilir → PDF'teki tür farklıysa adlar yeniden hesaplanır, öyle varsa yazılmaz.
+  Fark olduğunda açıklama metni log'a yazılır (açıklamadan kural çıkarmak için). Test klasöründeki (D:\dev\x) yanlış adlı 10 dosya eski kuraldan kaldı.
+
 ## 10. Eski program: Luca Entegrasyon (C:\LucaEntegrasyon) — inceleme
 - Java 11 masaüstü (Swing/SWT), `LucaEntegrasyon.jar` (Agem/Luca), başlatma `lucaentegrasyon.bat`.
 - Ayar: `LucaBeyanname.xml` → `filePath = \\SUNUCU\beyannameler\LUCA` (= Y:\), dönem seçimi, GİB ve Luca giriş bilgileri.

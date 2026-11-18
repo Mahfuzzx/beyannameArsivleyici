@@ -26,7 +26,29 @@ public static class SgkPdfOkuyucu
     // PDF'te tek parça: "211110808076543203402-20/000"
     static readonly Regex SicilRx = new(@"(\d{21})-(\d{2})/(\d{3})", RegexOptions.Compiled);
 
-    public static string? SicilOku(byte[] pdf)
+    public static string? SicilOku(byte[] pdf) => Oku(pdf).Sicil;
+
+    public static string? SicilOku(string dosya) => SicilOku(File.ReadAllBytes(dosya));
+
+    /// <summary>
+    /// Sicil no ve belge türü. Belge türü: PDF'te "SOSYAL GÜVENLİK DESTEK PRİMİ" geçiyorsa "02" (SGDP, emekli çalışan), yoksa "01".
+    /// Arşivde doğrulandı (§9.4): 02 dosyalarında var, 01 dosyalarında yok. e-Beyanname açıklama metni bunu güvenilir vermiyor.
+    /// </summary>
+    public static (string? Sicil, string BelgeTuru) Oku(byte[] pdf)
+    {
+        var metin = Metin(pdf);
+        var m = SicilRx.Match(metin);
+        var sicil = m.Success ? m.Groups[1].Value + m.Groups[2].Value + m.Groups[3].Value : null;
+        return (sicil, BelgeTuru(metin));
+    }
+
+    public static string BelgeTuru(string metin)
+    {
+        var sik = new string(metin.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToUpperInvariant();
+        return sik.Contains("DESTEKPR", StringComparison.Ordinal) || sik.Contains("SGDP", StringComparison.Ordinal) ? "02" : "01";
+    }
+
+    public static string Metin(byte[] pdf)
     {
         using var doc = PdfDocument.Open(pdf);
         var sb = new StringBuilder();
@@ -35,11 +57,8 @@ public static class SgkPdfOkuyucu
             sb.Append(p.Text).Append(' ');
             sb.Append(string.Join(" ", p.GetWords().Select(w => w.Text))).Append(' ');
         }
-        var m = SicilRx.Match(sb.ToString());
-        return m.Success ? m.Groups[1].Value + m.Groups[2].Value + m.Groups[3].Value : null;
+        return sb.ToString();
     }
-
-    public static string? SicilOku(string dosya) => SicilOku(File.ReadAllBytes(dosya));
 }
 
 /// <summary>Sicil anahtarı → (müşteri X klasörü, işyeri klasörü) eşlemesi. Luca'dan ve X:\ PDF'lerinden beslenir.</summary>

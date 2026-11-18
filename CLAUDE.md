@@ -93,7 +93,10 @@ Bugün yapılanlar:
 
 ### Açık işler
 - X (SGK) arşiviyle karşılaştırma yapılmadı (Ekim SGK'ları arşivde yoktu; ağ sürücüsü de bağlantısızdı) — Eylül ile denenmeli.
-- SGK belge türü eşlemesi (01/02) gerçek verilerle doğrulanmadı.
+- ~~SGK belge türü eşlemesi (01/02)~~ — 2026-11-18 çözüldü: tür tahakkuk PDF'inden okunuyor (SGDP = 02), arşivde 1135/1135 doğru (§9.4).
+- Gerçek arşive geçiş denetimi yapıldı (§9.4): müşteri klasörleri ve Y:\ evrakları tanınıyor. X:\ SGK adlarının birebir karşılaştırması
+  hâlâ yapılamadı (bu birimin test indirmesindeki SGK dönemleri arşivde yok); geçişte ilk turun log'u izlenmeli.
+- Test klasöründe (D:\dev\x) eski kuralla yanlış adlanmış 10 SGDP dosyası var (`01_00000` olmalıydı `02_00000`); gerçek arşivi etkilemez.
 - Luca'dan işyeri aktarımı uygulamada canlı denenmedi.
 - Test indirmesinde bir müşterinin işyeri klasörü müşteri adıyla aynı çıktı (`{yıl}\{müşteri}\{müşteri}`) — kaynağı (X arşivinden öğrenme?) incelenmeli.
 - Gerçek arşive (Y:\, X:\) geçmeden önce ayarlardaki test klasörleri geri alınmalı.
