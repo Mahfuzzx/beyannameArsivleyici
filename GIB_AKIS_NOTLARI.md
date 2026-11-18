@@ -216,6 +216,15 @@ X:\{YIL}\{MÜKELLEF_KLASÖRÜ_TR}\{İŞYERİ}\{dosya}.pdf
 - Önerilen türler: KDV1, MUHSGK, GGECICI, KGECICI + müşterinin Y arşivinde aralıktaki yıllarda klasörü olan türler (`MusteriTaramasi.VarsayilanTurler`).
 - Liste birim filtresine uyan müşterileri gösterir. Sonuç ana tabloya gelir; "Listele ve eksikleri indir" ya da sonra "Eksikleri indir".
 - Uzun aralıkta düzeltme sırası daha doğru çıkar (asıl ve düzeltmeler aynı listede).
+- **İlk canlı deneme (2026-11-18 10:55):** 1 şirket, 01/2025–11/2026, 5 tür → 5 sorgu 8 sn, 101 onaylı beyanname; indirme 262 PDF, 0 hata.
+  (~23 aylık yükleme aralığı kabul edildi; 3+ yıllık aralık henüz denenmedi.)
+  Gerçek arşivle: Y'de tüm evraklar tanınıyor (KDV1 98, KDV2 44, MUHSGK 42, KGECICI 14, KURUMLAR 2); yeni olanlar Ekim 2026 MUHSGK.
+  **X SGK: 68 dosya tanınıyor (02 = SGDP dahil), başka işyeri klasörüne düşen yok**; 4 yeni = Ekim 2026. → SGK adlandırması doğrulandı.
+  Müşterinin 2025–26'da 29 düzeltmesi var; arşivde bunların bir kısmı **eksik** (ör. bir dönemde GİB'de 5 sürüm, arşivde yalnız asıl) →
+  gerçek arşive geçişte program bu eksik düzeltmeleri `_DÜZn` ile tamamlayacak. Arşivde elle damgasız `_DÜZ`/`_DÜZ2` ya da `_DÜZ`'süz ama
+  farklı damgalı kaydedilmiş düzeltmeler önek sayımıyla tanınıyor.
+- SGDP bildirim açıklaması: `Asıl, SOS.GÜV.DES PRİM BİLDİRGE, Kanun türü yoktur, 09 / 2025, {sicil}, Yasal süresinde verilme` →
+  `SgkAdParcalari` artık bunu 02 tanıyor (ön kontrol); kesin karar yine PDF'ten.
 
 ## 10. Eski program: Luca Entegrasyon (C:\LucaEntegrasyon) — inceleme
 - Java 11 masaüstü (Swing/SWT), `LucaEntegrasyon.jar` (Agem/Luca), başlatma `lucaentegrasyon.bat`.

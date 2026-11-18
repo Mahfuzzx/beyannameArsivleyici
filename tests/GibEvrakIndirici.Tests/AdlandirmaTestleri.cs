@@ -53,6 +53,7 @@ public class AdlandirmaTestleri
     [InlineData("Asıl, TÜM SİG.KOLLARI/YABNC UYR, 05510-Say.Kan.MYO, 09 / 2026, 01234567890123000", "01", "05510", "ASIL")]
     [InlineData("Ek, TÜM SİG.KOLLARI, 06111-Say.Kan., 09 / 2026, 1", "01", "06111", "EK1")]
     [InlineData("Asıl, SOSYAL GÜVENLİK DESTEK PRİMİ, Kanun Yok, 09 / 2026, 1", "02", "00000", "ASIL")]
+    [InlineData("Asıl, SOS.GÜV.DES PRİM BİLDİRGE, Kanun türü yoktur, 09 / 2025, 01234567890123000, Yasal süresinde verilme", "02", "00000", "ASIL")]
     public void SgkAdParcalari(string aciklama, string bt, string kanun, string mahiyet)
         => Assert.Equal((bt, kanun, mahiyet), DosyaAdlari.SgkAdParcalari(aciklama));
 

@@ -79,7 +79,10 @@ public static class DosyaAdlari
                     : "ASIL";
 
         var turMetni = parcalar.Length > 1 ? parcalar[1].ToUpper(new CultureInfo("tr-TR")) : "";
-        var belgeTuru = turMetni.Contains("DESTEK") || turMetni.Contains("SGDP") ? "02" : "01";
+        // GİB SGDP'yi kısaltarak yazar: "Asıl, SOS.GÜV.DES PRİM BİLDİRGE, Kanun türü yoktur, ..." (2026-11-18 log'dan).
+        // Kesin karar yine tahakkuk PDF'inden verilir (§9.4); bu yalnız "zaten var mı" ön kontrolü için.
+        var sik = turMetni.Replace(" ", "").Replace(".", "");
+        var belgeTuru = sik.Contains("DESTEK") || sik.Contains("SGDP") || sik.Contains("DESPR") || sik.Contains("SOSGÜVDES") ? "02" : "01";
 
         var km = KanunRegex.Match(aciklama);
         var kanun = km.Success ? km.Groups[1].Value : "00000";
