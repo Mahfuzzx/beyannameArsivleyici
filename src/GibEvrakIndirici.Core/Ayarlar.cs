@@ -1,6 +1,8 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace GibEvrakIndirici.Core;
+
+public enum MusteriFiltresi { Hepsi, BirimOnekiOlmayanlar, SadeceBirimOnekliler }
 
 public sealed class Ayarlar
 {
@@ -33,6 +35,46 @@ public sealed class Ayarlar
         KisitlamaBeklemeleriDk.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(s => double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : -1)
             .Where(d => d > 0).Select(TimeSpan.FromMinutes).ToList();
+
+    // ---------------- Birim (müşteri filtresi) ----------------
+    // Ofiste iki birim aynı Luca listesini ve aynı GİB girişini kullanır; diğer birimin müşterilerinin kısa adı "0 " ile başlar.
+    // Her birim programı kendi bilgisayarında, kendi filtresi ve kendi arşiv kökleriyle çalıştırır. Günlük GİB kotası ortaktır.
+
+    [System.ComponentModel.Category("Birim"), System.ComponentModel.DisplayName("Müşteri filtresi"),
+     System.ComponentModel.Description("Hepsi / BirimOnekiOlmayanlar (bu birim) / SadeceBirimOnekliler (diğer birim). Filtre dışındaki müşterilerin evrakı indirilmez, tabloda gösterilmez.")]
+    public MusteriFiltresi Filtre { get; set; } = MusteriFiltresi.Hepsi;
+
+    [System.ComponentModel.Category("Birim"), System.ComponentModel.DisplayName("Birim öneki"),
+     System.ComponentModel.Description("Diğer birimin müşterilerinin Luca kısa adının başı (sondaki boşluk dahil).")]
+    public string BirimOneki { get; set; } = "0 ";
+
+    [System.ComponentModel.Category("Birim"), System.ComponentModel.DisplayName("Klasör adında öneki at"),
+     System.ComponentModel.Description("Evet: \"0 ABC\" müşterisinin arşiv klasörü ABC olur (diğer birimin kurulumu için).")]
+    public bool KlasordeBirimOnekiniAt { get; set; }
+
+    public bool MusteriDahil(Musteri m) => MusteriDahil(m.KisaAd);
+
+    public bool MusteriDahil(string kisaAd)
+    {
+        bool onekli = BirimOneki.Length > 0 && kisaAd.StartsWith(BirimOneki, StringComparison.Ordinal);
+        return Filtre switch
+        {
+            MusteriFiltresi.BirimOnekiOlmayanlar => !onekli,
+            MusteriFiltresi.SadeceBirimOnekliler => onekli,
+            _ => true,
+        };
+    }
+
+    [System.Text.Json.Serialization.JsonIgnore, System.ComponentModel.Browsable(false)]
+    public string AtilacakKlasorOneki => KlasordeBirimOnekiniAt ? BirimOneki : "";
+
+    [System.Text.Json.Serialization.JsonIgnore, System.ComponentModel.Browsable(false)]
+    public string FiltreAciklamasi => Filtre switch
+    {
+        MusteriFiltresi.BirimOnekiOlmayanlar => $"\"{BirimOneki}\" ile başlamayan müşteriler",
+        MusteriFiltresi.SadeceBirimOnekliler => $"yalnız \"{BirimOneki}\" ile başlayan müşteriler" + (KlasordeBirimOnekiniAt ? " (klasör adında önek atılır)" : ""),
+        _ => "tüm müşteriler",
+    };
 
     /// <summary>Luca üye no (c_musteri_id) — işyeri aktarımı için.</summary>
     public string LucaUyeNo { get; set; } = "";

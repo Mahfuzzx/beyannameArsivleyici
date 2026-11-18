@@ -1,5 +1,6 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using GibEvrakIndirici.Core;
+using GibEvrakIndirici.Core.Adlandirma;
 using GibEvrakIndirici.Core.Arsiv;
 using GibEvrakIndirici.Core.Ebyn;
 using GibEvrakIndirici.Core.Indirme;
@@ -140,10 +141,12 @@ sealed class AnaForm : Form
             await OtomatikAkisAsync();
         };
 
+        _musteriler.KlasorOnekiniAt(_ayarlar.AtilacakKlasorOneki);
         if (_musteriler.Liste.Count == 0)
             Log(Seviye.Uyari, "Müşteri listesi boş. \"Müşteri Excel'i al\" ile Luca müşteri listesini içe aktarın.");
         else
             Log(Seviye.Bilgi, $"{_musteriler.Liste.Count} müşteri, {_isyerleri.Kayitlar.Count} SGK işyeri kaydı yüklendi.");
+        FiltreyiBildir();
 
         _sekmeler.SelectedTab = _gibSekme;
         try { await _gib.BaslatAsync(); }
@@ -224,7 +227,7 @@ sealed class AnaForm : Form
         var ilerleme = new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); });
         var ozet = await Indirici().CalistirAsync(_satirlar, ilerleme, ct);
         TabloyuDoldur();
-        var metin = $"{(ozet.Durduruldu ? "Yarıda kesildi (GİB kısıtlaması)" : "Bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}";
+        var metin = $"{(ozet.Durduruldu ? "Yarıda kesildi (GİB kısıtlaması)" : "Bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}" + (ozet.FiltreDisi > 0 ? $", filtre dışı: {ozet.FiltreDisi}" : "");
         Log(Seviye.Bilgi, metin); Durum(metin);
     });
 
@@ -237,7 +240,7 @@ sealed class AnaForm : Form
         TabloyuDoldur();
         var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct);
         TabloyuDoldur();
-        Log(Seviye.Bilgi, $"Arşiv taraması {(ozet.Durduruldu ? "yarıda kesildi (GİB kısıtlaması)" : "bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}");
+        Log(Seviye.Bilgi, $"Arşiv taraması {(ozet.Durduruldu ? "yarıda kesildi (GİB kısıtlaması)" : "bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}" + (ozet.FiltreDisi > 0 ? $", filtre dışı: {ozet.FiltreDisi}" : ""));
     });
 
     async Task MusteriExceliAlAsync()
@@ -272,8 +275,10 @@ sealed class AnaForm : Form
                                   "Bu sırada Luca'da başka işlem yapmayın. Devam edilsin mi?", "Luca işyeri aktarımı",
                 MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
 
-        var liste = await new LucaIsyeriAktarici(_luca).AktarAsync(_ayarlar.LucaUyeNo, new Progress<string>(Durum), ct);
-        var n = LucaIsyeriAktarici.DepoyaEkle(_isyerleri, liste);
+        var liste = await new LucaIsyeriAktarici(_luca).AktarAsync(_ayarlar.LucaUyeNo, new Progress<string>(Durum), ct,
+            firmaDahil: _ayarlar.MusteriDahil);
+        var klasorler = _musteriler.Liste.GroupBy(m => m.KisaAd).ToDictionary(g => g.Key, g => g.First().XKlasor);
+        var n = LucaIsyeriAktarici.DepoyaEkle(_isyerleri, liste, f => klasorler.GetValueOrDefault(f) ?? KlasorAdi.XIcin(f));
         _isyerleri.Kaydet(Ayarlar.IsyeriDosyasi);
         Log(Seviye.Bilgi, $"Luca'dan {n} işyeri alındı ({liste.Select(i => i.FirmaKisaAd).Distinct().Count()} firma).");
     });
@@ -282,8 +287,18 @@ sealed class AnaForm : Form
     {
         if (!Diyaloglar.AyarlariDuzenle(this, _ayarlar)) { _ayarlar = Ayarlar.Ac(); return; }
         _ayarlar.Kaydet();
+        _musteriler.KlasorOnekiniAt(_ayarlar.AtilacakKlasorOneki);
         Log(Seviye.Bilgi, "Ayarlar kaydedildi.");
+        FiltreyiBildir();
         TabloyuDoldur();
+    }
+
+    void FiltreyiBildir()
+    {
+        if (_ayarlar.Filtre == MusteriFiltresi.Hepsi) return;
+        int dahil = _musteriler.Liste.Count(_ayarlar.MusteriDahil);
+        Log(Seviye.Bilgi, $"Müşteri filtresi: {_ayarlar.FiltreAciklamasi} — {dahil}/{_musteriler.Liste.Count} müşteri işlenecek. " +
+                          $"Arşiv: {_ayarlar.YArsivKok} / {_ayarlar.XArsivKok}");
     }
 
     // ---------------- tablo ----------------
@@ -294,8 +309,10 @@ sealed class AnaForm : Form
         var ind = Indirici();
         _gorunum.RaiseListChangedEvents = false;
         _gorunum.Clear();
+        int filtreDisi = 0;
         foreach (var b in _satirlar.OrderBy(x => x.Unvan).ThenBy(x => x.Tur).ThenBy(x => x.YuklemeZamani))
         {
+            if (_musteriler.Bul(b.VknTckn) is { } fm && !_ayarlar.MusteriDahil(fm)) { filtreDisi++; continue; }
             var d = ind.Durum(b, siralar.GetValueOrDefault(b.Oid));
             var g = SatirGorunumu.Olustur(b, d);
             if (_sadeceEksik.Checked && !g.EksikVar) continue;
@@ -303,7 +320,7 @@ sealed class AnaForm : Form
         }
         _gorunum.RaiseListChangedEvents = true;
         _gorunum.ResetBindings();
-        Durum($"{_satirlar.Count} kayıt, {_gorunum.Count} gösteriliyor");
+        Durum($"{_satirlar.Count} kayıt, {_gorunum.Count} gösteriliyor" + (filtreDisi > 0 ? $", {filtreDisi} filtre dışı" : ""));
     }
 
     void TabloBicimle(object? s, DataGridViewCellFormattingEventArgs e)

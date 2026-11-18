@@ -8,13 +8,22 @@ public sealed class MusteriDeposu
 {
     readonly List<Musteri> _liste = [];
     Dictionary<string, Musteri> _kimlik = new();
+    string _atilanOnek = "";
 
     public IReadOnlyList<Musteri> Liste => _liste;
 
+    /// <summary>Klasör adlarında kısa addan atılacak birim öneki ("" = atılmaz). Sonraki Yukle/Birlestir'de de geçerli.</summary>
+    public void KlasorOnekiniAt(string onek)
+    {
+        _atilanOnek = onek ?? "";
+        Yukle(_liste.ToList());
+    }
+
     public void Yukle(IEnumerable<Musteri> musteriler)
     {
+        var yeni = musteriler.Select(m => m.AtilanOnek == _atilanOnek ? m : m with { AtilanOnek = _atilanOnek }).ToList();
         _liste.Clear();
-        _liste.AddRange(musteriler);
+        _liste.AddRange(yeni);
         _kimlik = new Dictionary<string, Musteri>();
         foreach (var m in _liste)
         {

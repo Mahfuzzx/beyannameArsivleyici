@@ -36,6 +36,14 @@ Kullanıcıyla Türkçe konuşulur. Ayrıntılı keşif notları ve tüm kararla
 - Klasör adı Luca "Kısa Ad"dan: X = boşluk→`_`; Y = ayrıca Ş→S Ğ→G Ü→U Ö→O Ç→C, İ→`_`.
 - Eski adlar (damgasız / `yyyyMMddHHmmss`) önek sayımıyla "var" sayılır; `_MAHSUP`, `_ÖD`, `T ÖD`, `B.xls` gibi elle eklenenler sayılmaz.
 
+## İki birim (2026-11-18 kararı)
+- Ofiste ikinci bir birim var; onun müşterilerinin Luca kısa adı **"0 "** ile başlar (231 müşterinin 102'si). Luca Excel'i ortak.
+- Diğer birim programı **kendi bilgisayarında, aynı GİB girişiyle** kullanacak → **günlük GİB kotası iki birim arasında ortak**.
+- Her kurulum kendi `ayarlar.json`'unda: `Filtre` (Hepsi / BirimOnekiOlmayanlar / SadeceBirimOnekliler), `BirimOneki` ("0 "),
+  `KlasordeBirimOnekiniAt` (diğer birim: evet → "0 ABC" klasörü `ABC`), kendi `YArsivKok`/`XArsivKok`.
+- Filtre dışı müşteri için GİB'e hiç istek atılmaz (kota korunur), tabloda gösterilmez; Luca işyeri aktarımı da yalnız filtredeki firmaları dolaşır.
+- Önek yalnız klasör adından atılır (`Musteri.AtilanOnek`, kaydedilmez); kısa ad, eşleşme ve Luca firma adı aynen kalır.
+
 ## Kullanıcı kararları
 Tam otomatik (giriş sonrası listele → eksikleri indir) · açılışta son 31 günün eksikleri · yalnız Onaylandı · yeni müşteriye klasör aynı kuralla ·
 tek bilgisayar · SGK belgeleri e-Beyanname'den (e-Bildirge değil) · Luca'dan işyeri alma özelliği var.
@@ -77,6 +85,9 @@ Bugün yapılanlar:
   her çalıştırmada tekrarlanıyordu. Artık eksiksiz tamamlanan beyanname OID'leri `%APPDATA%\GibEvrakIndirici\tamamlanan.json`'a
   yazılır (`TamamlananDeposu`, anahtar arşiv köklerini içerir) ve tekrar sorgulanmaz. PDF'siz/işlemde bildirim ya da belirlenemeyen işyeri
   varsa tamam sayılmaz. İlk çalıştırmada liste boş olduğundan bekleme bir kez daha yaşanır.
+- Birim filtresi eklendi (yukarıda "İki birim"). Bu bilgisayarın ayarı henüz `Hepsi`; kullanıcı Ayarlar › Birim'den seçecek.
+- Diğer birime dağıtım henüz yapılmadı: hedef bilgisayarda .NET 10 Desktop Runtime + WebView2 Runtime gerekir
+  (ya da self-contained `dotnet publish`). Kota ortak olduğu için günlük bütçe planı daha da önemli.
 - Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).
 

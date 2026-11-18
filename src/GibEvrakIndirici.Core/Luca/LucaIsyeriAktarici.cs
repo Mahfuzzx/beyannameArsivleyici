@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
 using GibEvrakIndirici.Core.Adlandirma;
@@ -81,13 +81,15 @@ public sealed class LucaIsyeriAktarici(ILucaTasiyici tasiyici)
     static DateTime? Tarih(string? s) =>
         DateTime.TryParseExact(s?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 
-    public async Task<List<Isyeri>> AktarAsync(string uyeNo, IProgress<string>? ilerleme, CancellationToken ct)
+    /// <param name="firmaDahil">Birim filtresi: false dönen firmaların işyerleri hiç istenmez.</param>
+    public async Task<List<Isyeri>> AktarAsync(string uyeNo, IProgress<string>? ilerleme, CancellationToken ct, Func<string, bool>? firmaDahil = null)
     {
         var onceki = await tasiyici.AktifFirmaAsync(ct);
         var sonuc = new List<Isyeri>();
         try
         {
-            var firmalar = FirmalariAyristir(await tasiyici.GetAsync($"editEBildirgeGirisDosyaAction.do?c_musteri_id={uyeNo}", ct));
+            var firmalar = FirmalariAyristir(await tasiyici.GetAsync($"editEBildirgeGirisDosyaAction.do?c_musteri_id={uyeNo}", ct))
+                .Where(f => firmaDahil?.Invoke(f.FirmaKisaAd) ?? true).ToList();
             int i = 0;
             foreach (var f in firmalar)
             {
@@ -109,12 +111,13 @@ public sealed class LucaIsyeriAktarici(ILucaTasiyici tasiyici)
     static long Zaman() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     /// <summary>Luca işyerlerini sicil deposuna ekler (müşteri X klasörü = firma kısa adından).</summary>
-    public static int DepoyaEkle(IsyeriDeposu depo, IEnumerable<Isyeri> isyerleri)
+    /// <param name="musteriKlasoru">Firma kısa adı → müşteri X klasörü (birim öneki atılıyorsa müşteri deposundan); verilmezse kuraldan.</param>
+    public static int DepoyaEkle(IsyeriDeposu depo, IEnumerable<Isyeri> isyerleri, Func<string, string>? musteriKlasoru = null)
     {
         int n = 0;
         foreach (var i in isyerleri)
         {
-            depo.Ekle(new IsyeriDeposu.Kayit(KlasorAdi.XIcin(i.FirmaKisaAd), KlasorAdi.XIcin(i.KisaAd), i.Sicil, "Luca", i.Bitis));
+            depo.Ekle(new IsyeriDeposu.Kayit(musteriKlasoru?.Invoke(i.FirmaKisaAd) ?? KlasorAdi.XIcin(i.FirmaKisaAd), KlasorAdi.XIcin(i.KisaAd), i.Sicil, "Luca", i.Bitis));
             n++;
         }
         return n;

@@ -13,6 +13,8 @@ public sealed record IndirmeOlayi(Seviye Seviye, string Mesaj, string? Dosya = n
 public sealed class IndirmeOzeti
 {
     public int Indirilen, Atlanan, Uyari, Hata;
+    /// <summary>Birim filtresi dışında kaldığı için hiç işlenmeyen beyanname satırı.</summary>
+    public int FiltreDisi;
     /// <summary>Oturum düştüğü veya GİB kısıtlaması sürdüğü için yarıda kesildi.</summary>
     public bool Durduruldu;
 }
@@ -87,6 +89,7 @@ public sealed class Indirici(
                 Bildir(Seviye.Uyari, $"{b.VknTckn} {b.Unvan}: müşteri listesinde yok, atlandı");
                 continue;
             }
+            if (!ayarlar.MusteriDahil(m)) { ozet.FiltreDisi++; continue; } // diğer birimin müşterisi: GİB'e istek yok
             int sira = EtkinSira(b, m, siralar.GetValueOrDefault(b.Oid));
             for (int kisitlama = 0; ; kisitlama++)
             {

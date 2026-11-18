@@ -66,8 +66,20 @@ public sealed record Musteri
     /// <summary>Elle verilmiş Y:\ klasör adı (boşsa kuraldan türetilir).</summary>
     public string? YKlasorOzel { get; init; }
 
-    public string XKlasor => string.IsNullOrWhiteSpace(XKlasorOzel) ? Adlandirma.KlasorAdi.XIcin(KisaAd) : XKlasorOzel!;
-    public string YKlasor => string.IsNullOrWhiteSpace(YKlasorOzel) ? Adlandirma.KlasorAdi.YIcin(KisaAd) : YKlasorOzel!;
+    /// <summary>
+    /// Klasör adı türetilirken kısa addan atılacak birim öneki (ör. "0 "; diğer birimin kurulumunda). Kaydedilmez,
+    /// <see cref="Musteriler.MusteriDeposu.KlasorOnekiniAt"/> ile verilir.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string AtilanOnek { get; init; } = "";
+
+    /// <summary>Klasör adının türetildiği kısa ad (birim öneki atılmış).</summary>
+    public string KlasorKisaAdi => AtilanOnek.Length > 0 && KisaAd.StartsWith(AtilanOnek, StringComparison.Ordinal) && KisaAd.Length > AtilanOnek.Length
+        ? KisaAd[AtilanOnek.Length..].Trim()
+        : KisaAd;
+
+    public string XKlasor => string.IsNullOrWhiteSpace(XKlasorOzel) ? Adlandirma.KlasorAdi.XIcin(KlasorKisaAdi) : XKlasorOzel!;
+    public string YKlasor => string.IsNullOrWhiteSpace(YKlasorOzel) ? Adlandirma.KlasorAdi.YIcin(KlasorKisaAdi) : YKlasorOzel!;
 }
 
 /// <summary>Luca'daki bir SGK işyeri.</summary>
