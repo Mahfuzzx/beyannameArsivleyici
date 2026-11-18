@@ -20,6 +20,7 @@ sealed class AnaForm : Form
     Ayarlar _ayarlar = Ayarlar.Ac();
     MusteriDeposu _musteriler = MusteriDeposu.Ac(Ayarlar.MusteriDosyasi);
     IsyeriDeposu _isyerleri = IsyeriDeposu.Ac(Ayarlar.IsyeriDosyasi);
+    readonly TamamlananDeposu _tamamlanan = TamamlananDeposu.Ac(Ayarlar.TamamlananDosyasi);
     List<BeyannameSatiri> _satirlar = [];
     readonly BindingList<SatirGorunumu> _gorunum = [];
     CancellationTokenSource? _iptal;
@@ -168,7 +169,15 @@ sealed class AnaForm : Form
 
     Indirici Indirici() => new(Istemci(), _musteriler, _isyerleri, _ayarlar,
         s => Task.FromResult(Diyaloglar.IsyeriSor(this, s)),
-        () => _isyerleri.Kaydet(Ayarlar.IsyeriDosyasi));
+        () => _isyerleri.Kaydet(Ayarlar.IsyeriDosyasi),
+        tamamlanan: _tamamlanan);
+
+    /// <summary>İndirme bitince/kesilince tamamlanan listesini diske yazar.</summary>
+    void TamamlananKaydet()
+    {
+        try { _tamamlanan.Kaydet(Ayarlar.TamamlananDosyasi); }
+        catch (Exception ex) { Log(Seviye.Uyari, "Tamamlanan listesi kaydedilemedi: " + ex.Message); }
+    }
 
     async Task IsCalistirAsync(string ad, Func<CancellationToken, Task> is_)
     {
@@ -194,6 +203,7 @@ sealed class AnaForm : Form
         catch (Exception ex) { Log(Seviye.Hata, $"{ad}: {ex.Message}"); }
         finally
         {
+            TamamlananKaydet();
             _iptal.Dispose(); _iptal = null;
             foreach (var b in _isDugmeleri) b.Enabled = true;
             _durdur.Enabled = false;

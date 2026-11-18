@@ -43,6 +43,7 @@ public sealed class Ayarlar
     public static string AyarDosyasi => Path.Combine(VeriKlasoru, "ayarlar.json");
     public static string MusteriDosyasi => Path.Combine(VeriKlasoru, "musteriler.json");
     public static string IsyeriDosyasi => Path.Combine(VeriKlasoru, "isyerleri.json");
+    public static string TamamlananDosyasi => Path.Combine(VeriKlasoru, "tamamlanan.json");
     public static string LogKlasoru => Path.Combine(VeriKlasoru, "log");
 
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true };

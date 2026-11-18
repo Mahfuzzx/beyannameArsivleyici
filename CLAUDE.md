@@ -73,6 +73,10 @@ Bugün yapılanlar:
 - 4. tur: 471 indirildi, 0 hata, kısıtlama yok → **kota günlük sıfırlanıyor** (§12.3). Gerçek arşivle 228 dosyanın 214'ü birebir.
 - Düzeltildi: pencere dışı asıl beyannamesi olan düzeltmeler artık `_DÜZ` olarak indiriliyor (`Indirici.EtkinSira`, §9.2) —
   önceden "zaten var" sanılıp kaçırılıyordu. SGK listesindeki "Vergi" satırı uyarısı kaldırıldı. 1 sn kuralı POST'ta da var (§12.3).
+- Atlanan satırlar beklemesin (kullanıcı isteği): MUHSGK'da SGK bildirim listesi ve ihbarname listesi sorguları (POST, ≥1 sn kuralı)
+  her çalıştırmada tekrarlanıyordu. Artık eksiksiz tamamlanan beyanname OID'leri `%APPDATA%\GibEvrakIndirici\tamamlanan.json`'a
+  yazılır (`TamamlananDeposu`, anahtar arşiv köklerini içerir) ve tekrar sorgulanmaz. PDF'siz/işlemde bildirim ya da belirlenemeyen işyeri
+  varsa tamam sayılmaz. İlk çalıştırmada liste boş olduğundan bekleme bir kez daha yaşanır.
 - Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).
 

@@ -34,9 +34,11 @@ public sealed class Indirici(
     Ayarlar ayarlar,
     Func<IsyeriSorusu, Task<string?>> isyeriSor,
     Action? isyerleriDegisti = null,
-    Func<TimeSpan, CancellationToken, Task>? bekle = null)
+    Func<TimeSpan, CancellationToken, Task>? bekle = null,
+    TamamlananDeposu? tamamlanan = null)
 {
     readonly Func<TimeSpan, CancellationToken, Task> _bekle = bekle ?? Task.Delay;
+    readonly TamamlananDeposu _tamamlanan = tamamlanan ?? new();
 
     /// <summary>
     /// Pencere dışındaki eski asıl beyannameyi de hesaba katan düzeltme sırası: listedeki sıra ile arşivde bu satırdan
@@ -158,6 +160,8 @@ public sealed class Indirici(
     async Task IhbarnamelerAsync(BeyannameSatiri b, Musteri m, int sira, DateTime zaman, Action<Seviye, string, string?> bildir, CancellationToken ct)
     {
         var klasor = ArsivDenetci.BeyannameKlasoru(ayarlar.YArsivKok, m, b);
+        var anahtar = TamamlananDeposu.Anahtar(ayarlar, b.Oid, "IHB");
+        if (_tamamlanan.Var(anahtar)) return;
         // İlk ihbarname zaten varsa listeyi sorgulamaya gerek yok
         if (ArsivDenetci.VarMi(klasor, DosyaAdlari.BeyannameOnek(b, EvrakTuru.Ihbarname, 1),
                 DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Ihbarname, sira, 1, zaman), sira))
@@ -171,18 +175,25 @@ public sealed class Indirici(
                 DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Ihbarname, sira, i + 1, zaman), sira,
                 () => istemci.PdfAsync(EbynKomutlari.IhbarnamePdf(ih), ct), bildir);
         }
+        // Buraya hatasız gelindiyse tüm ihbarnameler arşivde (hata olsaydı istisna yukarı çıkardı)
+        _tamamlanan.Ekle(anahtar);
     }
 
     async Task SgkAsync(BeyannameSatiri b, Musteri m, Action<Seviye, string, string?> bildir, CancellationToken ct)
     {
+        var anahtar = TamamlananDeposu.Anahtar(ayarlar, b.Oid, "SGK");
+        if (_tamamlanan.Var(anahtar)) return;
+
         var bildirimler = await istemci.SgkBildirimleriAsync(b.Oid, ct);
         var sayac = new Dictionary<string, int>();
+        bool tam = true; // PDF'siz (işlemde) bildirim ya da belirlenemeyen işyeri varsa sonraki çalıştırmada yeniden sorgulanır
         foreach (var s in bildirimler)
         {
             if (!s.PdfVar)
             {
                 // MUHSGK'nın vergi kısmı da bu listede "Vergi" satırı olarak gelir; SGK PDF'i hiç olmaz → uyarı gereksiz.
                 if (s.Aciklama.Trim().StartsWith("Vergi", StringComparison.OrdinalIgnoreCase)) continue;
+                tam = false;
                 bildir(Seviye.Uyari, $"{m.KisaAd} {b.Donem}: SGK bildirimi PDF'siz (hatalı/işlemde) — {s.Aciklama}", null);
                 continue;
             }
@@ -207,6 +218,7 @@ public sealed class Indirici(
             var isyeri = sicil is null ? null : await IsyeriBulAsync(m, sicil);
             if (isyeri is null)
             {
+                tam = false;
                 bildir(Seviye.Uyari, $"{m.KisaAd} {b.Donem}: SGK işyeri belirlenemedi (sicil {sicil ?? "okunamadı"}), atlandı", null);
                 continue;
             }
@@ -217,6 +229,7 @@ public sealed class Indirici(
             await TekEvrakAsync(klasor, hOnek, DosyaAdlari.SgkDosyasi(b.Donem, bt, kn, mh, EvrakTuru.SgkHizmetListesi, b.YuklemeZamani), 0,
                 () => istemci.PdfAsync(EbynKomutlari.SgkHizmetPdf(s), ct), bildir);
         }
+        if (tam) _tamamlanan.Ekle(anahtar);
     }
 
     async Task<string?> IsyeriBulAsync(Musteri m, string sicil)
@@ -237,7 +250,8 @@ public sealed class Indirici(
         var hedef = Path.Combine(klasor, ad);
         if (ArsivDenetci.VarMi(klasor, onek, ad, sira))
         {
-            bildir(Seviye.Atlandi, $"zaten var: {ad}", hedef);
+            // KDV'de onay zamanı PDF indirilmeden bilinmez → ad yükleme zamanlı olabilir; o zaman yalnız öneki göster
+            bildir(Seviye.Atlandi, File.Exists(hedef) ? $"zaten var: {ad}" : $"zaten var: {onek}_… (arşivdeki adla)", hedef);
             return;
         }
         var veri = await indir();
