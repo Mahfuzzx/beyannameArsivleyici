@@ -257,6 +257,37 @@ X:\{YIL}\{MÜKELLEF_KLASÖRÜ_TR}\{İŞYERİ}\{dosya}.pdf
   Aralıkta aday yoksa sürüm eksik sayılır; PDF zaten indirileceği için birebir karşılaştırma da yapılır.
 - Sonraki sürümün yükleme zamanı aynı listedeki gruptan (`DuzeltmeSiralayici.SonrakiYuklemeler`) gelir; listede yoksa üst sınır yükleme + 1 gün.
 - Sağlık raporu (arşivdeki kopyalar, hiçbir GİB sürümüne uymayan dosyalar, eksik sürümler) sonraki aşama.
+- Canlıda doğrulandı (§9.8 sonrası tarama): 1 müşteri, 01/2021–11/2026 → 603 "zaten var", 84 gerçekten eksik (ör. 01.10.2026'da toplu verilmiş
+  eski dönem KDV1 düzeltmeleri, arşivde hiç olmayan FORMBA/BS ayları), indirme sonrası klasörde aynı sürümden iki dosya yok.
+
+### 9.8 Ad düzeltme — eski adlı dosyaları PDF içeriğiyle standart ada çevirme (2026-11-18)
+Sorun: eski programların / elle verilmiş adlar (`04_NISAN_{KISAAD}_NISAN_KDV(AYLIK).xml_BYN`, `…_KDV1_37_01112023-30112023_BYN_4`,
+`2025 02 B DÜZ`, `2024 T`, `…_BEYANNAME_{kısaltma}_{AY}_KDV_AYLIK_.XML_-`, damgasız ya da `yyyyMMddHHmmss` damgalı önekli adlar)
+"var" sayılamıyor → evrak eksik görünüyor ve yeniden indiriliyordu.
+- Yer: Müşteri taraması sekmesi › "Adları düzelt…" (seçili müşteri × tür × dönem aralığı; önce GİB listesi alınır, PDF kotası harcanmaz).
+  "Önekli adları da kat" seçilmezse yalnız tamamen eski biçimler önerilir.
+- `EvrakIcerigi` (PdfPig, 1. sayfa): beyanname = "Onay Zamanı" + VKN/TCKN; tahakkuk = "TAHAKKUK FİŞİ" ya da Ba/Bs "BİLDİRİM ALINDISI",
+  dönem `AA/YYYY-AA/YYYY` ve sonraki tarih (kabul). Metni olmayan (taranmış) PDF → Okunamadı.
+- `AdDuzeltici.Oner`: beyanname onay zamanı tek bir GİB sürümünün aralığına (§9.7) düşmeli; VKN müşterininki olmalı; yıl klasörü doğru olmalı
+  (değilse YanlisKlasor, taşınmaz). Tahakkuk: aynı adlı beyanname eşinin sürümü (`.xml_THK`→`.xml_BYN`, `_TAHAKKUK`→`_BEYANNAME`, tek başına `T`→`B`),
+  eşi yoksa dönem + kabul tarihiyle tek sürüm. Yeni ad `DosyaAdlari.BeyannameDosyasi` ile (KDV'de onay zamanı, düzeltme sırası GİB'den).
+- Dokunulmayanlar: `ÖD`/`OD` (tek başına), MAHSUP, ÖDEME, DEKONT, `.xml_ALN`, KOPYA, ihbarnameler.
+- **Kopya:** hedef ad zaten varsa, iki dosya aynı ada çıkıyorsa ya da **aynı sürüm klasörde başka bir standart adla zaten varsa**
+  (ör. eski program KDV'yi yükleme zamanıyla adlamış: `…_14_02_23` varken elle konmuş kopyanın doğru adı `…_14_02_36`) → Kopya, dokunulmaz.
+  Bu son kural ilk canlı denemede 2 kopya ve 1 ödeme dosyası (`_OD`) yanlış adlandırıldıktan sonra eklendi; o 3 dosya elle eski adına alındı.
+- Uygulama: kullanıcı listede onaylar → `File.Move(overwrite:false)`; her taşıma `%APPDATA%\GibEvrakIndirici\ad-duzeltme\yyyy-MM-dd_HHmmss.tsv`
+  günlüğüne yazılır. "Düzeltmeyi geri al…" günlüğü tersten uygular (hedef varsa atlar), sonra günlüğü `.geri-alindi` yapar. Arşiv dizini güncellenir.
+- Canlı deneme: 1 müşteri, 2021–2026, 7 tür → 16 eski + 420 önekli ad düzeltildi, 4 kopya, 3 belirsiz kaldı. Ardından tarama 04/2022 KDV1'i "var" saydı.
+
+### 9.9 Toplu yazdırma sekmesi (2026-11-18)
+- Tür + dönem tipi (aylık / 3 aylık / yıllık; türe göre varsayılan) + ay/yıl; evrak: beyanname, tahakkuk, ihbarname; MUHSGK'da ayrıca
+  SGK tahakkuk / SGK hizmet listesi. "Yalnız son sürüm" (en büyük `_DÜZ`; SGK'ya uygulanmaz, asıl/ek/iptal ayrı belge).
+- `ArsivListesi.Bul`: Y'de `{etiket}_{TÜR}_{BELGE}` önekiyle (yalnız standart/önekli adlar; eski adlar için önce §9.8), X'te dönemin her ayı için
+  müşterinin **tüm işyeri klasörleri**. Elle eklenenler (`…_ÖD`, borç durum yazısı) listelenmez. Yalnız birim filtresindeki müşteriler.
+- Sıralama: müşteriye göre (müşteri › beyanname evrakları › işyeri › ay › SGK tahakkuk › hizmet listesi) ya da evrak türüne göre.
+- `PdfYazdirici`: Windows.Data.Pdf ile sayfa 200 DPI resme çizilir → `PrintDocument` tek iş (PDF okuyucusuna bağlı değil); yatay sayfa döndürülür.
+  Bunun için uygulama TFM'i `net10.0-windows10.0.19041.0` (çıktı klasörü aynı kaldı: `bin\Debug\net10.0-windows`).
+- Canlı: MUHSGK 10/2026, 35–37 dosya ağ yazıcısına gönderildi, hatasız.
 
 ## 10. Eski program: Luca Entegrasyon (C:\LucaEntegrasyon) — inceleme
 - Java 11 masaüstü (Swing/SWT), `LucaEntegrasyon.jar` (Agem/Luca), başlatma `lucaentegrasyon.bat`.

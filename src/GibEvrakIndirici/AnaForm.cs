@@ -107,9 +107,16 @@ sealed class AnaForm : Form
         // Müşteri taraması sekmesi
         _taramaSekme = new MusteriTaramaSekmesi(() => _musteriler.Liste, () => _ayarlar);
         _taramaSekme.Tara += MusteriTaramasiAsync;
+        _taramaSekme.AdDuzelt += AdDuzeltAsync;
+        _taramaSekme.GeriAl += GeriAlAsync;
         _isDugmeleri.AddRange(_taramaSekme.Dugmeler);
 
-        _sekmeler.TabPages.AddRange([_evrakSekme, _taramaSekme, _gibSekme, _lucaSekme]);
+        // Toplu yazdırma sekmesi
+        var yazdirmaSekme = new YazdirmaSekmesi(() => _musteriler.Liste, () => _ayarlar);
+        yazdirmaSekme.Yazdir += YazdirAsync;
+        _isDugmeleri.AddRange(yazdirmaSekme.Dugmeler);
+
+        _sekmeler.TabPages.AddRange([_evrakSekme, _taramaSekme, yazdirmaSekme, _gibSekme, _lucaSekme]);
         _sekmeler.SelectedIndexChanged += async (_, _) =>
         {
             if (_sekmeler.SelectedTab == _lucaSekme && !_lucaBasladi) { _lucaBasladi = true; await _luca.BaslatAsync(); }
@@ -294,9 +301,22 @@ sealed class AnaForm : Form
     {
         _sekmeler.SelectedTab = _evrakSekme;
         Log(Seviye.Bilgi, "Müşteri taraması: " + MusteriTaramasi.Aciklama(istek));
+        var satirlar = await MusteriSatirlariAsync(istek, ct);
+        _satirlar = satirlar.SelectMany(x => x.Satirlar).GroupBy(x => x.Oid).Select(g => g.First()).ToList();
+        TabloyuDoldur();
+        Log(Seviye.Bilgi, $"Müşteri taraması listelendi: {_satirlar.Count} beyanname." + (indir ? "" : " İndirmek için \"Eksikleri indir\"."));
+        if (!indir) return;
+        var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct, Oran("İndiriliyor (beyanname)"));
+        TabloyuDoldur();
+        Log(Seviye.Bilgi, $"Müşteri taraması {(ozet.Durduruldu ? "yarıda kesildi (GİB kısıtlaması)" : "bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}");
+    });
+
+    /// <summary>Her seçili müşteri için GİB'deki onaylı beyannameler (dönem başından bugüne yüklenenler).</summary>
+    async Task<List<(Musteri M, List<BeyannameSatiri> Satirlar)>> MusteriSatirlariAsync(MusteriTaramasiIstegi istek, CancellationToken ct)
+    {
         var istemci = Istemci();
         var ilerleme = new Progress<string>(Durum);
-        var satirlar = new List<BeyannameSatiri>();
+        var sonuc = new List<(Musteri, List<BeyannameSatiri>)>();
         var oran = Oran("Listeleniyor (müşteri × tür)");
         int toplamSorgu = istek.Musteriler.Count * istek.Turler.Count, bitenSorgu = 0;
         oran.Report((0, toplamSorgu));
@@ -312,15 +332,70 @@ sealed class AnaForm : Form
             var l = await istemci.MukellefBeyannameleriAsync(kimlik, istek.Turler, istek.Aralik, DateTime.Today, ilerleme, ct,
                 turBitti: () => oran.Report((++bitenSorgu, toplamSorgu)));
             Log(Seviye.Bilgi, $"{m.KisaAd}: {l.Count} onaylı beyanname");
-            satirlar.AddRange(l);
+            sonuc.Add((m, l));
         }
-        _satirlar = satirlar.GroupBy(x => x.Oid).Select(g => g.First()).ToList();
-        TabloyuDoldur();
-        Log(Seviye.Bilgi, $"Müşteri taraması listelendi: {_satirlar.Count} beyanname." + (indir ? "" : " İndirmek için \"Eksikleri indir\"."));
-        if (!indir) return;
-        var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct, Oran("İndiriliyor (beyanname)"));
-        TabloyuDoldur();
-        Log(Seviye.Bilgi, $"Müşteri taraması {(ozet.Durduruldu ? "yarıda kesildi (GİB kısıtlaması)" : "bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}");
+        return sonuc;
+    }
+
+    /// <summary>Arşiv ad düzeltmesi (§9.8): GİB listesi + PDF içeriği → öneri penceresi → onaylananlar yeniden adlandırılır.</summary>
+    Task AdDuzeltAsync(MusteriTaramasiIstegi istek, bool onekliler) => IsCalistirAsync("Ad düzeltme", async ct =>
+    {
+        _sekmeler.SelectedTab = _evrakSekme;
+        Log(Seviye.Bilgi, "Ad düzeltme taraması: " + MusteriTaramasi.Aciklama(istek) + (onekliler ? " (önekli adlar dahil)" : ""));
+        var liste = await MusteriSatirlariAsync(istek, ct);
+        var oran = Oran("Arşiv PDF'leri okunuyor (müşteri)");
+        var oneriler = new List<AdOnerisi>();
+        for (int i = 0; i < liste.Count; i++)
+        {
+            oran.Report((i, liste.Count));
+            var (m, satirlar) = liste[i];
+            var l = await Task.Run(() => AdDuzeltici.Oner(m, satirlar, _ayarlar, istek.Turler, istek.Aralik.BasYil, istek.Aralik.BitYil,
+                yol => EvrakIcerigi.Oku(File.ReadAllBytes(yol)), onekliler, ct), ct);
+            Log(Seviye.Bilgi, $"{m.KisaAd}: {l.Count} standart dışı dosya, {l.Count(o => o.Durum == OneriDurumu.Onerilen)} ad önerildi" +
+                              (l.Count(o => o.Durum == OneriDurumu.Kopya) is var k and > 0 ? $", {k} kopya olabilir" : ""));
+            oneriler.AddRange(l);
+        }
+        oran.Report((liste.Count, liste.Count));
+        if (oneriler.Count == 0) { Log(Seviye.Bilgi, "Standart dışı adlı dosya bulunamadı."); return; }
+
+        using var f = new AdDuzeltmeFormu(oneriler, _ayarlar.YArsivKok);
+        if (f.ShowDialog(this) != DialogResult.OK) { Log(Seviye.Bilgi, "Ad düzeltme: hiçbir dosyaya dokunulmadı."); return; }
+        var gunluk = AdDuzeltmeGunlugu.YeniGunlukYolu(Ayarlar.AdDuzeltmeKlasoru, DateTime.Now);
+        var secilen = f.Secilenler;
+        var s = await Task.Run(() => AdDuzeltmeGunlugu.Uygula(secilen, gunluk, _dizin), ct);
+        foreach (var h in s.Hatalar) Log(Seviye.Uyari, "Ad düzeltme: " + h);
+        Log(Seviye.Bilgi, $"Ad düzeltme bitti — yeniden adlandırılan: {s.Basarili}, atlanan: {s.Atlanan}." +
+                          (s.GunlukDosyasi is { } g ? $" Geri alma günlüğü: {Path.GetFileName(g)}" : ""));
+    });
+
+    Task GeriAlAsync() => IsCalistirAsync("Düzeltmeyi geri alma", async ct =>
+    {
+        Directory.CreateDirectory(Ayarlar.AdDuzeltmeKlasoru);
+        using var d = new OpenFileDialog
+        {
+            InitialDirectory = Ayarlar.AdDuzeltmeKlasoru, Filter = "Ad düzeltme günlüğü (*.tsv)|*.tsv", Title = "Geri alınacak ad düzeltmesi",
+        };
+        if (d.ShowDialog(this) != DialogResult.OK) return;
+        var satir = File.ReadLines(d.FileName).Count(l => l.Contains('\t'));
+        if (MessageBox.Show(this, $"{Path.GetFileName(d.FileName)}: {satir} dosya eski adına döndürülecek. Devam edilsin mi?", "Geri al",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        _sekmeler.SelectedTab = _evrakSekme;
+        var s = await Task.Run(() => AdDuzeltmeGunlugu.GeriAl(d.FileName, _dizin), ct);
+        foreach (var h in s.Hatalar) Log(Seviye.Uyari, "Geri alma: " + h);
+        Log(Seviye.Bilgi, $"Geri alma bitti — eski adına dönen: {s.Basarili}, atlanan: {s.Atlanan}.");
+    });
+
+    /// <summary>Toplu yazdırma (§9.9): tek yazdırma işi, arka planda; ilerleme durum çubuğunda.</summary>
+    Task YazdirAsync(IReadOnlyList<string> dosyalar, System.Drawing.Printing.PrinterSettings yazici, string isAdi) => IsCalistirAsync("Yazdırma", async ct =>
+    {
+        Log(Seviye.Bilgi, $"Yazdırma: {isAdi} → {yazici.PrinterName}");
+        var oran = Oran("Yazdırılıyor (dosya)");
+        int hata = 0;
+        var sayfa = await Task.Run(() => PdfYazdirici.Yazdir(dosyalar, yazici, isAdi,
+            (i, n, ad) => { oran.Report((i, n)); if (ad.Length > 0) BeginInvoke(() => Durum(ad)); },
+            (yol, ex) => { hata++; BeginInvoke(() => Log(Seviye.Hata, $"{Path.GetFileName(yol)} yazdırılamadı: {ex.Message}")); },
+            ct), ct);
+        Log(Seviye.Bilgi, $"Yazdırma {(ct.IsCancellationRequested ? "durduruldu" : "yazıcıya gönderildi")} — {sayfa} sayfa" + (hata > 0 ? $", {hata} dosya açılamadı" : ""));
     });
 
     async Task MusteriExceliAlAsync()

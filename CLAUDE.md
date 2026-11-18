@@ -8,9 +8,10 @@ Kullanıcıyla Türkçe konuşulur. Ayrıntılı keşif notları ve tüm kararla
 - `src/GibEvrakIndirici.Core` (net10.0) — iş mantığı, UI'sız, test edilebilir. ClosedXML (müşteri Excel'i), PdfPig (PDF metni).
   - `Ebyn/` e-Beyanname: `EbynKomutlari` (beyaz liste + URL/parametre üretimi), `EbynIstemci` (hız sınırı, PDF doğrulama, yeniden deneme,
     kısıtlama/oturum hataları), `EbynAyristirici` (SERVICERESULT ve liste HTML'i), `BeyannamePdfOkuyucu` (onay zamanı).
-  - `Indirme/Indirici` eksik evrakları indirir; `Arsiv/ArsivDenetci` "zaten var mı"; `Adlandirma/` klasör ve dosya adları;
+  - `Indirme/Indirici` eksik evrakları indirir; `Arsiv/ArsivDenetci` "zaten var mı"; `Arsiv/AdDuzeltici`+`EvrakIcerigi` eski adları PDF içeriğiyle düzeltir (§9.8);
+    `Arsiv/ArsivListesi` toplu yazdırma listesi (§9.9); `Adlandirma/` klasör ve dosya adları;
     `Musteriler/` Luca müşteri Excel'i → JSON; `Sgk/` sicil okuma + sicil→işyeri tablosu; `Luca/` Luca'dan toplu işyeri aktarımı; `Ayarlar`.
-- `src/GibEvrakIndirici` (net10.0-windows, WinForms + WebView2) — `AnaForm`, `GibOturumu` (DVD girişi → e-Beyanname SSO, istekleri sayfa
+- `src/GibEvrakIndirici` (net10.0-windows10.0.19041.0 — Windows.Data.Pdf için; çıktı yine `bin\Debug\net10.0-windows`, WinForms + WebView2) — `AnaForm`, `GibOturumu` (DVD girişi → e-Beyanname SSO, istekleri sayfa
   içinde `fetch` ile atar, TOKEN sayfada), `LucaOturumu`, `WebViewYardimci` (`Runtime.evaluate`).
 - `tests/GibEvrakIndirici.Tests` (xUnit). "Gerçek…" adlı testler bu makinedeki gerçek dosyaları okur, yoksa sessizce geçer.
 - Komutlar: `dotnet test tests\GibEvrakIndirici.Tests` · `dotnet build GibEvrakIndirici.sln`.
@@ -101,6 +102,11 @@ Bugün yapılanlar:
 - Durum çubuğuna ilerleme çubuğu eklendi (listeleme: ay dilimi; müşteri taraması: müşteri × tür; indirme: beyanname satırı; kalan süre tahmini).
 - Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).
+- **Ad düzeltme (§9.8):** Müşteri taraması › "Adları düzelt…": eski/önekli adlar PDF içeriği (onay zamanı, dönem, kabul) + GİB listesiyle
+  standart ada; kullanıcı onaylar, `ad-duzeltme\*.tsv` geri alma günlüğü, "Düzeltmeyi geri al…". ÖD/OD, MAHSUP, ihbarname dokunulmaz;
+  aynı sürüm başka standart adla varsa Kopya. Canlı: 1 müşteride 436 ad düzeltildi; sonraki tarama eski dosyaları "var" saydı (603 var, 84 gerçek eksik).
+- **Toplu yazdırma sekmesi (§9.9):** tür × dönem × evrak (MUHSGK'da SGK tahakkuk/hizmet listesi, tüm işyerleri), Windows.Data.Pdf ile yazdırır. Canlı denendi.
+- Bilinen arşiv tuhaflığı: bir müşteride 2024 KGECICI 2. dönem iki dosya da asıl adlı (biri `_DÜZ` olmalı) — eski, elle bakılacak.
 
 ### Açık işler
 - X (SGK) arşiviyle karşılaştırma yapılmadı (Ekim SGK'ları arşivde yoktu; ağ sürücüsü de bağlantısızdı) — Eylül ile denenmeli.

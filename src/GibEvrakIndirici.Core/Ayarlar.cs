@@ -88,6 +88,8 @@ public sealed class Ayarlar
     public static string TamamlananDosyasi => Path.Combine(VeriKlasoru, "tamamlanan.json");
     public static string ArsivDiziniDosyasi => Path.Combine(VeriKlasoru, "arsiv-dizini.json");
     public static string LogKlasoru => Path.Combine(VeriKlasoru, "log");
+    /// <summary>Arşiv ad düzeltmelerinin geri alma günlükleri (§9.8).</summary>
+    public static string AdDuzeltmeKlasoru => Path.Combine(VeriKlasoru, "ad-duzeltme");
 
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 

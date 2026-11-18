@@ -41,6 +41,18 @@ public sealed class ArsivDizini
         return onay;
     }
 
+    /// <summary>Dosya yeniden adlandırıldı: okunmuş bilgi yeni yola taşınır (içerik aynı, yeniden okumaya gerek yok).</summary>
+    public void Tasindi(string eski, string yeni)
+    {
+        lock (_kilit)
+        {
+            if (!_kayitlar.Remove(eski, out var k)) return;
+            try { var fi = new FileInfo(yeni); _kayitlar[yeni] = k with { Boyut = fi.Length, YazmaUtc = fi.LastWriteTimeUtc }; }
+            catch (Exception) { }
+            _degisti = true;
+        }
+    }
+
     static readonly JsonSerializerOptions Json = new() { WriteIndented = false };
 
     public static ArsivDizini Ac(string dosya)

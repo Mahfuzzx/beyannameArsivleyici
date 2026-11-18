@@ -22,6 +22,14 @@ sealed class MusteriTaramaSekmesi : TabPage
 
     /// <summary>indir = true ise listeleme ardından eksikler de indirilir.</summary>
     public event Func<MusteriTaramasiIstegi, bool, Task>? Tara;
+    /// <summary>Ad düzeltme önerileri (bool: önekli eski adlar da önerilsin mi).</summary>
+    public event Func<MusteriTaramasiIstegi, bool, Task>? AdDuzelt;
+    public event Func<Task>? GeriAl;
+
+    readonly CheckBox _onekliler = new()
+    {
+        AutoSize = true, Text = "Önekli ama zamansız adları da öner (ör. \"…_BEYANNAME_…AYLIK_.XML_-\"; program bunları zaten tanır)",
+    };
 
     public List<Button> Dugmeler { get; } = [];
 
@@ -73,6 +81,18 @@ sealed class MusteriTaramaSekmesi : TabPage
         calistir.Controls.Add(Dugme("Listele", () => CalistirAsync(indir: false), isDugmesi: true));
         calistir.Controls.Add(Dugme("Listele ve eksikleri indir", () => CalistirAsync(indir: true), isDugmesi: true));
         sag.Controls.Add(calistir);
+
+        sag.Controls.Add(new Label
+        {
+            AutoSize = true, MaximumSize = new Size(520, 0), Margin = new Padding(3, 18, 3, 3),
+            Text = "Arşiv adlarını düzelt: seçili müşterilerin bu dönem ve türlerdeki eski adlı beyanname/tahakkuk PDF'lerine, " +
+                   "PDF içeriği ve GİB listesine göre doğru ad önerilir. Önce öneri listesi gösterilir; onaylamadan hiçbir dosyaya dokunulmaz.",
+        });
+        sag.Controls.Add(_onekliler);
+        var duzelt = new FlowLayoutPanel { AutoSize = true };
+        duzelt.Controls.Add(Dugme("Adları düzelt…", AdDuzeltAsync, isDugmesi: true));
+        duzelt.Controls.Add(Dugme("Düzeltmeyi geri al…", () => GeriAl?.Invoke() ?? Task.CompletedTask, isDugmesi: true));
+        sag.Controls.Add(duzelt);
 
         Controls.Add(sag);
         Controls.Add(sol);
@@ -167,5 +187,14 @@ sealed class MusteriTaramaSekmesi : TabPage
         if (musteriler.Count == 0) { MessageBox.Show(this, "En az bir müşteri seçin.", Text); return; }
         if (turler.Count == 0) { MessageBox.Show(this, "En az bir beyanname türü seçin.", Text); return; }
         if (Tara is { } t) await t(new MusteriTaramasiIstegi(musteriler, Aralik(), turler), indir);
+    }
+
+    async Task AdDuzeltAsync()
+    {
+        var musteriler = Secililer();
+        var turler = _turler.CheckedItems.Cast<string>().ToList();
+        if (musteriler.Count == 0) { MessageBox.Show(this, "En az bir müşteri seçin.", Text); return; }
+        if (turler.Count == 0) { MessageBox.Show(this, "En az bir beyanname türü seçin.", Text); return; }
+        if (AdDuzelt is { } a) await a(new MusteriTaramasiIstegi(musteriler, Aralik(), turler), _onekliler.Checked);
     }
 }
