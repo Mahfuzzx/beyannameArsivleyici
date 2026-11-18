@@ -46,6 +46,7 @@ sealed class AnaForm : Form
     readonly List<Button> _isDugmeleri = [];
     Button _durdur = null!;
 
+    readonly MusteriTaramaSekmesi _taramaSekme;
     GibOturumu _gib = null!;
     LucaOturumu _luca = null!;
     bool _lucaBasladi;
@@ -100,7 +101,12 @@ sealed class AnaForm : Form
         _lucaSekme.Controls.Add(_lucaWeb);
         _lucaSekme.Controls.Add(lucaUst);
 
-        _sekmeler.TabPages.AddRange([_evrakSekme, _gibSekme, _lucaSekme]);
+        // Müşteri taraması sekmesi
+        _taramaSekme = new MusteriTaramaSekmesi(() => _musteriler.Liste, () => _ayarlar);
+        _taramaSekme.Tara += MusteriTaramasiAsync;
+        _isDugmeleri.AddRange(_taramaSekme.Dugmeler);
+
+        _sekmeler.TabPages.AddRange([_evrakSekme, _taramaSekme, _gibSekme, _lucaSekme]);
         _sekmeler.SelectedIndexChanged += async (_, _) =>
         {
             if (_sekmeler.SelectedTab == _lucaSekme && !_lucaBasladi) { _lucaBasladi = true; await _luca.BaslatAsync(); }
@@ -241,6 +247,31 @@ sealed class AnaForm : Form
         var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct);
         TabloyuDoldur();
         Log(Seviye.Bilgi, $"Arşiv taraması {(ozet.Durduruldu ? "yarıda kesildi (GİB kısıtlaması)" : "bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}" + (ozet.FiltreDisi > 0 ? $", filtre dışı: {ozet.FiltreDisi}" : ""));
+    });
+
+    /// <summary>Seçili müşteriler × türler × dönem aralığı (§9.5). Sonuç ana tabloya gelir; istenirse eksikler indirilir.</summary>
+    Task MusteriTaramasiAsync(MusteriTaramasiIstegi istek, bool indir) => IsCalistirAsync("Müşteri taraması", async ct =>
+    {
+        _sekmeler.SelectedTab = _evrakSekme;
+        Log(Seviye.Bilgi, "Müşteri taraması: " + MusteriTaramasi.Aciklama(istek));
+        var istemci = Istemci();
+        var ilerleme = new Progress<string>(Durum);
+        var satirlar = new List<BeyannameSatiri>();
+        foreach (var m in istek.Musteriler)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (MusteriTaramasi.Kimlik(m) is not { } kimlik) { Log(Seviye.Uyari, $"{m.KisaAd}: VKN/TCKN yok, atlandı"); continue; }
+            var l = await istemci.MukellefBeyannameleriAsync(kimlik, istek.Turler, istek.Aralik, DateTime.Today, ilerleme, ct);
+            Log(Seviye.Bilgi, $"{m.KisaAd}: {l.Count} onaylı beyanname");
+            satirlar.AddRange(l);
+        }
+        _satirlar = satirlar.GroupBy(x => x.Oid).Select(g => g.First()).ToList();
+        TabloyuDoldur();
+        Log(Seviye.Bilgi, $"Müşteri taraması listelendi: {_satirlar.Count} beyanname." + (indir ? "" : " İndirmek için \"Eksikleri indir\"."));
+        if (!indir) return;
+        var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct);
+        TabloyuDoldur();
+        Log(Seviye.Bilgi, $"Müşteri taraması {(ozet.Durduruldu ? "yarıda kesildi (GİB kısıtlaması)" : "bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}");
     });
 
     async Task MusteriExceliAlAsync()

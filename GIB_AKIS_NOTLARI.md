@@ -209,6 +209,14 @@ X:\{YIL}\{MÜKELLEF_KLASÖRÜ_TR}\{İŞYERİ}\{dosya}.pdf
   Akış: açıklamaya göre "var mı" bakılır → yoksa tahakkuk indirilir → PDF'teki tür farklıysa adlar yeniden hesaplanır, öyle varsa yazılmaz.
   Fark olduğunda açıklama metni log'a yazılır (açıklamadan kural çıkarmak için). Test klasöründeki (D:\dev\x) yanlış adlı 10 dosya eski kuraldan kaldı.
 
+### 9.5 Müşteri taraması sekmesi (2026-11-18)
+- Seçili müşteri(ler) × seçili türler × **vergilendirme dönemi** aralığı. §9.1 istisnası kullanılır: VKN/TCKN + tür + dönem (P) +
+  yükleme aralığı (Z = dönem başı → bugün). Her müşteri × tür ayrı sorgu (tüm sayfalar); sonuç başlangıç ayı aralıkta olan dönemlerle sınırlanır.
+- Kimlik: TCKN varsa TCKN (şahıslar e-Beyanname'de TCKN ile görünür), yoksa VKN.
+- Önerilen türler: KDV1, MUHSGK, GGECICI, KGECICI + müşterinin Y arşivinde aralıktaki yıllarda klasörü olan türler (`MusteriTaramasi.VarsayilanTurler`).
+- Liste birim filtresine uyan müşterileri gösterir. Sonuç ana tabloya gelir; "Listele ve eksikleri indir" ya da sonra "Eksikleri indir".
+- Uzun aralıkta düzeltme sırası daha doğru çıkar (asıl ve düzeltmeler aynı listede).
+
 ## 10. Eski program: Luca Entegrasyon (C:\LucaEntegrasyon) — inceleme
 - Java 11 masaüstü (Swing/SWT), `LucaEntegrasyon.jar` (Agem/Luca), başlatma `lucaentegrasyon.bat`.
 - Ayar: `LucaBeyanname.xml` → `filePath = \\SUNUCU\beyannameler\LUCA` (= Y:\), dönem seçimi, GİB ve Luca giriş bilgileri.

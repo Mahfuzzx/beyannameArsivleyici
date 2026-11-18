@@ -110,6 +110,38 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
         return sonuc.GroupBy(x => x.Oid).Select(g => g.First()).ToList();
     }
 
+    /// <summary>
+    /// Tek mükellefin seçili türlerdeki onaylı beyannameleri, vergilendirme dönemi aralığına göre (§9.1 istisnası:
+    /// VKN/TCKN + tür + dönem verilince uzun yükleme aralığı kabul edilir). Yükleme aralığı = dönem başı → bugün.
+    /// Sonuç, başlangıç ayı aralık içinde kalan dönemlerle sınırlanır.
+    /// </summary>
+    public async Task<List<BeyannameSatiri>> MukellefBeyannameleriAsync(string vknTckn, IEnumerable<string> turler, Donem aralik,
+        DateTime bugun, IProgress<string>? ilerleme, CancellationToken ct)
+    {
+        var sonuc = new List<BeyannameSatiri>();
+        var yukBas = new DateTime(aralik.BasYil, aralik.BasAy, 1);
+        int bas = aralik.BasYil * 12 + aralik.BasAy, bit = aralik.BitYil * 12 + aralik.BitAy;
+        foreach (var tur in turler)
+        {
+            int sayfa = 1, sayfaSayisi = 1;
+            do
+            {
+                ilerleme?.Report($"{vknTckn} {tur}: sayfa {sayfa}/{sayfaSayisi}");
+                var y = await PostAsync(EbynKomutlari.ListeMukellefTurDonem(vknTckn, tur, aralik, yukBas, bugun, sayfa), ct);
+                if (!y.Basarili)
+                {
+                    if (y.Hata.Contains("bulunamam", StringComparison.OrdinalIgnoreCase)) break;
+                    throw new EbynHatasi($"{tur}: {y.Hata}");
+                }
+                var l = EbynAyristirici.BeyannameListesi(y.Html);
+                sonuc.AddRange(l.Satirlar.Where(s => s.Donem.BasYil * 12 + s.Donem.BasAy is var a && a >= bas && a <= bit));
+                sayfaSayisi = l.SayfaSayisi;
+                sayfa++;
+            } while (sayfa <= sayfaSayisi);
+        }
+        return sonuc.GroupBy(x => x.Oid).Select(g => g.First()).ToList();
+    }
+
     public async Task<IReadOnlyList<IhbarnameBilgisi>> IhbarnamelerAsync(string beyannameOid, CancellationToken ct)
     {
         var y = await PostAsync(EbynKomutlari.Ihbarnameler(beyannameOid), ct);

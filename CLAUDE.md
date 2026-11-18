@@ -88,6 +88,8 @@ Bugün yapılanlar:
 - Birim filtresi eklendi (yukarıda "İki birim"). Bu bilgisayarın ayarı henüz `Hepsi`; kullanıcı Ayarlar › Birim'den seçecek.
 - Diğer birime dağıtım henüz yapılmadı: hedef bilgisayarda .NET 10 Desktop Runtime + WebView2 Runtime gerekir
   (ya da self-contained `dotnet publish`). Kota ortak olduğu için günlük bütçe planı daha da önemli.
+- "Müşteri taraması" sekmesi eklendi (`MusteriTaramaSekmesi`, `EbynIstemci.MukellefBeyannameleriAsync`, §9.5): seçili müşteriler ×
+  türler × vergilendirme dönemi aralığı. GİB'de canlı denenmedi (sorgu biçimi §9.1'de 16.11'de elle doğrulanmıştı).
 - Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).
 
