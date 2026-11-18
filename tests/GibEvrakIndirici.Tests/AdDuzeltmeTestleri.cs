@@ -134,6 +134,53 @@ public class AdDuzeltmeTestleri : IDisposable
     }
 
     [Fact]
+    public void DuzEkiEksikStandartAdlarDuzeltilir()
+    {
+        // Eski program düzeltmeyi _DÜZ'süz kaydetmiş: aynı dönemde iki "asıl"
+        var k = Klasor(2025, "KDV1");
+        var y1 = new DateTime(2025, 5, 28, 11, 43, 0);
+        var y2 = new DateTime(2026, 1, 28, 17, 34, 0);
+        var o1 = y1.AddSeconds(66);
+        var o2 = y2.AddSeconds(35);
+        Beyanname(k, "04_NISAN_KDV1_BEYANNAME_28.05.2025_11_44_06.pdf", o1);
+        Tahakkuk(k, "04_NISAN_KDV1_TAHAKKUK_28.05.2025_11_44_06.pdf", "04/2025-04/2025", "28/05/2025");
+        Beyanname(k, "04_NISAN_KDV1_BEYANNAME_28.01.2026_17_34_35.pdf", o2);
+        Tahakkuk(k, "04_NISAN_KDV1_TAHAKKUK_28.01.2026_17_34_35.pdf", "04/2025-04/2025", "28/01/2026");
+        File.WriteAllText(Path.Combine(k, "04_NISAN_KDV1_IHBARNAME2_28.01.2026_17_34_35.pdf"), "x");
+        var gib = new[] { Satir("KDV1", "04/2025-04/2025", y1), Satir("KDV1", "04/2025-04/2025", y2) };
+
+        var o = Oner(gib, "KDV1", 2025);
+
+        Assert.Equal(3, o.Count);
+        Assert.All(o, x => Assert.Equal(OneriDurumu.Onerilen, x.Durum));
+        var d = o.ToDictionary(x => x.EskiAd, x => x.YeniAd);
+        Assert.Equal("04_NISAN_KDV1_BEYANNAME_28.01.2026_17_34_35_DÜZ.pdf", d["04_NISAN_KDV1_BEYANNAME_28.01.2026_17_34_35.pdf"]);
+        Assert.Equal("04_NISAN_KDV1_TAHAKKUK_28.01.2026_17_34_35_DÜZ.pdf", d["04_NISAN_KDV1_TAHAKKUK_28.01.2026_17_34_35.pdf"]);
+        Assert.Equal("04_NISAN_KDV1_IHBARNAME2_28.01.2026_17_34_35_DÜZ.pdf", d["04_NISAN_KDV1_IHBARNAME2_28.01.2026_17_34_35.pdf"]);
+    }
+
+    [Fact]
+    public void YanlisDuzEkiDuzelirDogrusuVarsaKopya()
+    {
+        var k = Klasor(2018, "MUHSGK");
+        var y1 = new DateTime(2018, 5, 20, 10, 0, 0);
+        var y2 = new DateTime(2018, 6, 2, 9, 30, 0);
+        var y3 = new DateTime(2018, 6, 5, 9, 0, 0);
+        // 2. düzeltme _DÜZ ile kaydedilmiş (olmalı: _DÜZ2); 1. düzeltme hem doğru hem eksiz adla var
+        Beyanname(k, "04_NISAN_MUHSGK_BEYANNAME_05.06.2018_09_00_00_DÜZ.pdf", y3.AddMinutes(2));
+        Beyanname(k, "04_NISAN_MUHSGK_BEYANNAME_02.06.2018_09_30_00_DÜZ.pdf", y2.AddMinutes(2));
+        Beyanname(k, "04_NISAN_MUHSGK_BEYANNAME_02.06.2018_09_30_00.pdf", y2.AddMinutes(2));
+        var gib = new[] { Satir("MUHSGK", "04/2018-04/2018", y1), Satir("MUHSGK", "04/2018-04/2018", y2), Satir("MUHSGK", "04/2018-04/2018", y3) };
+
+        var o = Oner(gib, "MUHSGK", 2018).ToDictionary(x => x.EskiAd);
+
+        Assert.Equal(2, o.Count);
+        Assert.Equal(OneriDurumu.Onerilen, o["04_NISAN_MUHSGK_BEYANNAME_05.06.2018_09_00_00_DÜZ.pdf"].Durum);
+        Assert.Equal("04_NISAN_MUHSGK_BEYANNAME_05.06.2018_09_00_00_DÜZ2.pdf", o["04_NISAN_MUHSGK_BEYANNAME_05.06.2018_09_00_00_DÜZ.pdf"].YeniAd);
+        Assert.Equal(OneriDurumu.Kopya, o["04_NISAN_MUHSGK_BEYANNAME_02.06.2018_09_30_00.pdf"].Durum);
+    }
+
+    [Fact]
     public void BaskaMukellefVeUyumsuzOnayEslesmez()
     {
         var k = Klasor(2022, "KDV1");

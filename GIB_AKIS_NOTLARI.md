@@ -278,6 +278,10 @@ Sorun: eski programların / elle verilmiş adlar (`04_NISAN_{KISAAD}_NISAN_KDV(A
 - Uygulama: kullanıcı listede onaylar → `File.Move(overwrite:false)`; her taşıma `%APPDATA%\GibEvrakIndirici\ad-duzeltme\yyyy-MM-dd_HHmmss.tsv`
   günlüğüne yazılır. "Düzeltmeyi geri al…" günlüğü tersten uygular (hedef varsa atlar), sonra günlüğü `.geri-alindi` yapar. Arşiv dizini güncellenir.
 - Canlı deneme: 1 müşteri, 2021–2026, 7 tür → 16 eski + 420 önekli ad düzeltildi, 4 kopya, 3 belirsiz kaldı. Ardından tarama 04/2022 KDV1'i "var" saydı.
+- **Sürüm eki (2026-11-18 akşam):** standart adlı beyannameler de okunur; içerikteki onay zamanının GİB'deki sürümüne göre `_DÜZ`/`_DÜZn` eki
+  yanlışsa (ör. eski program 21.10.2026'da düzeltmeleri eksiz kaydetmiş → aynı dönemde iki "asıl") doğru ekli standart ad önerilir;
+  aynı ad gövdesindeki tahakkuk ve ihbarnameler birlikte. Doğru ekli dosya zaten varsa Kopya. Eki doğru olanların zaman damgasına dokunulmaz.
+  GİB'e PDF isteği atılmaz (yalnız liste), kota dolmuşken de çalışır.
 
 ### 9.9 Toplu yazdırma sekmesi (2026-11-18)
 - Tür + dönem tipi (aylık / 3 aylık / yıllık; türe göre varsayılan) + ay/yıl; evrak: beyanname, tahakkuk, ihbarname; MUHSGK'da ayrıca

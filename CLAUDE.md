@@ -107,7 +107,7 @@ Bugün yapılanlar:
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).
 - **Ad düzeltme (§9.8):** Müşteri taraması › "Adları düzelt…": eski/önekli adlar PDF içeriği (onay zamanı, dönem, kabul) + GİB listesiyle
   standart ada; kullanıcı onaylar, `ad-duzeltme\*.tsv` geri alma günlüğü, "Düzeltmeyi geri al…". ÖD/OD, MAHSUP, ihbarname dokunulmaz;
-  aynı sürüm başka standart adla varsa Kopya. Canlı: 1 müşteride 436 ad düzeltildi; sonraki tarama eski dosyaları "var" saydı (603 var, 84 gerçek eksik).
+  aynı sürüm başka standart adla varsa Kopya. Standart adlarda yanlış/eksik `_DÜZ` eki de içerikten düzeltilir (eşleriyle). Canlı: 1 müşteride 436 ad düzeltildi; sonraki tarama eski dosyaları "var" saydı (603 var, 84 gerçek eksik).
 - **Toplu yazdırma sekmesi (§9.9):** tür × dönem × evrak (MUHSGK'da SGK tahakkuk/hizmet listesi, tüm işyerleri), Windows.Data.Pdf ile yazdırır. Canlı denendi.
 - Bilinen arşiv tuhaflığı: bir müşteride 2024 KGECICI 2. dönem iki dosya da asıl adlı (biri `_DÜZ` olmalı) — eski, elle bakılacak.
 

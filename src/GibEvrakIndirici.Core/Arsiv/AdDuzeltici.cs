@@ -56,6 +56,9 @@ public static class AdDuzeltici
     static readonly Regex StandartRx = new(
         @"^(\d{2}_[A-Z]+|\d{2}_DONEM|\d{4})_[A-Z0-9]+_(BEYANNAME|TAHAKKUK|IHBARNAME\d*)_\d{2}\.\d{2}\.\d{4}_\d{2}_\d{2}_\d{2}(_DÜZ\d*)?$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    static readonly Regex StandartParcaRx = new(
+        @"^(?<onek>(\d{2}_[A-Z]+|\d{2}_DONEM|\d{4})_[A-Z0-9]+)_(?<belge>BEYANNAME|TAHAKKUK|IHBARNAME\d*)_(?<zaman>\d{2}\.\d{2}\.\d{4}_\d{2}_\d{2}_\d{2})(?<duz>_DÜZ\d*)?$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
     static readonly Regex OnekliRx = new(
         @"^(\d{2}_[A-Z]+|\d{2}_DONEM|\d{4})_[A-Z0-9]+_(?<belge>BEYANNAME|TAHAKKUK|IHBARNAME\d*)(_|$)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -269,6 +272,49 @@ public static class AdDuzeltici
             }
             var yeni = StandartAd(su, EvrakTuru.Tahakkuk, ayarlar, esOnay);
             onerilen.Add(OneriVeyaKopya(ad, bicim, yeni, su, EvrakTuru.Tahakkuk, $"{dayanak} → {su.B.Donem} {SiraMetni(su.Sira)}"));
+        }
+
+        // 2b) Standart adlı ama sürüm eki GİB sırasına uymayan beyannameler (ör. eski programın düzeltmeyi _DÜZ'süz kaydetmesi);
+        //     aynı ad gövdesini taşıyan tahakkuk ve ihbarnameleri de birlikte. Zaman damgası doğru eklilerde değiştirilmez.
+        foreach (var ad in dosyalar)
+        {
+            var p = StandartParcaRx.Match(ad);
+            if (!p.Success || p.Groups["belge"].Value != "BEYANNAME") continue;
+            if (BeyannameninSurumu(ad) is not { } su || !KlasorUyar(klasor, su)) continue;
+            var ic = Icerik(ad);
+            if (!kimlikler.Any(ic.KimlikIcerir)) continue;
+            var yeni = StandartAd(su, EvrakTuru.Beyanname, ayarlar, ic.Onay);
+            var beklenenEk = StandartParcaRx.Match(yeni).Groups["duz"].Value;
+            var mevcutEk = p.Groups["duz"].Value;
+            if (beklenenEk == mevcutEk) continue;
+
+            // Aynı sürüm doğru ekle zaten varsa bu dosya kopyadır
+            var dogru = dosyalar.FirstOrDefault(a => a != ad && StandartParcaRx.Match(a) is { Success: true } q
+                && q.Groups["belge"].Value == "BEYANNAME" && q.Groups["duz"].Value == beklenenEk && BeyannameninSurumu(a) == su);
+            var durum = dogru is null ? OneriDurumu.Onerilen : OneriDurumu.Kopya;
+            string Acik(string evrak) => dogru is null
+                ? $"sürüm eki yanlış: onay {ic.Onay:dd.MM.yyyy HH:mm:ss} → {su.B.Donem} {SiraMetni(su.Sira)} ({(beklenenEk.Length == 0 ? "eksiz" : beklenenEk.TrimStart('_'))} olmalı){evrak}"
+                : $"bu sürüm arşivde {dogru}.pdf adıyla zaten var — kopya olabilir";
+            onerilen.Add(Oneri(ad, AdBicimi.Standart, yeni + ".pdf", durum, Acik("")));
+
+            foreach (var es in dosyalar)
+            {
+                var e = StandartParcaRx.Match(es);
+                if (!e.Success || e.Groups["onek"].Value != p.Groups["onek"].Value
+                    || e.Groups["zaman"].Value != p.Groups["zaman"].Value || e.Groups["duz"].Value != mevcutEk) continue;
+                var belge = e.Groups["belge"].Value;
+                if (belge == "BEYANNAME") continue;
+                string esYeni;
+                if (belge == "TAHAKKUK")
+                    esYeni = StandartAd(su, EvrakTuru.Tahakkuk, ayarlar, ic.Onay);
+                else
+                {
+                    int n = belge.Length > "IHBARNAME".Length ? int.Parse(belge["IHBARNAME".Length..]) : 1;
+                    var zaman = ayarlar.OnayZamaniKullanilir(su.B.Tur) && ic.Onay is not null ? ic.Onay : su.B.YuklemeZamani;
+                    esYeni = Path.GetFileNameWithoutExtension(DosyaAdlari.BeyannameDosyasi(su.B, EvrakTuru.Ihbarname, su.Sira, n, zaman));
+                }
+                onerilen.Add(Oneri(es, AdBicimi.Standart, esYeni + ".pdf", durum, Acik($"; eşi: {ad}.pdf")));
+            }
         }
 
         // 3) Çakışmalar: hedef ad diskte varsa ya da iki dosya aynı ada çıktıysa → kopya (ikincisinden itibaren)
