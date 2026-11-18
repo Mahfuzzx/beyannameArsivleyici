@@ -22,7 +22,8 @@ public static class ArsivDenetci
 
     public static int EskiDosyaSayisi(string klasor, string onek) => Dosyalar(klasor, onek).Count();
 
-    static IEnumerable<string> Dosyalar(string klasor, string onek)
+    /// <summary>Önekle başlayan (önek sınırı '_' ya da ad sonu), elle eklenen ekleri taşımayan arşiv dosyalarının adları (.pdf'siz).</summary>
+    public static IEnumerable<string> Dosyalar(string klasor, string onek)
     {
         if (!Directory.Exists(klasor)) yield break;
         foreach (var yol in Directory.EnumerateFiles(klasor, "*.pdf", SearchOption.TopDirectoryOnly))

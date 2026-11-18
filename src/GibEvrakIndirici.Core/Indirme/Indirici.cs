@@ -95,15 +95,21 @@ public sealed class Indirici(
                 continue;
             }
             if (!ayarlar.MusteriDahil(m)) { ozet.FiltreDisi++; continue; } // diğer birimin müşterisi: GİB'e istek yok
+            var satirAnahtari = TamamlananDeposu.Anahtar(ayarlar, b.Oid, "SATIR");
+            if (_tamamlanan.Var(satirAnahtari)) { ozet.Atlanan++; continue; }
             int sira = EtkinSira(b, m, siralar.GetValueOrDefault(b.Oid));
             for (int kisitlama = 0; ; kisitlama++)
             {
                 try
                 {
                     // Var olan dosyalar atlandığı için aynı satırı yeniden denemek güvenlidir.
-                    var zaman = await BeyannameEvraklariAsync(b, m, sira, Bildir, ct);
-                    if (b.IhbarnameVar) await IhbarnamelerAsync(b, m, sira, zaman, Bildir, ct);
+                    var surum = await BeyannameEvraklariAsync(b, m, sira, Bildir, ct);
+                    if (b.IhbarnameVar) await IhbarnamelerAsync(b, m, sira, surum, Bildir, ct);
                     if (b.SgkBildirimVar) await SgkAsync(b, m, Bildir, ct);
+                    // Satırın tüm evrakı arşivde → sonraki çalıştırmalarda hiç GİB isteği yapılmaz (PDF içerik karşılaştırması tekrarlanmaz)
+                    if ((!b.IhbarnameVar || _tamamlanan.Var(TamamlananDeposu.Anahtar(ayarlar, b.Oid, "IHB")))
+                        && (!b.SgkBildirimVar || _tamamlanan.Var(TamamlananDeposu.Anahtar(ayarlar, b.Oid, "SGK"))))
+                        _tamamlanan.Ekle(satirAnahtari);
                     break;
                 }
                 catch (OperationCanceledException) { throw; }
@@ -134,55 +140,127 @@ public sealed class Indirici(
     }
 
     /// <summary>
-    /// Beyanname + tahakkuk. KDV türlerinde (Ayarlar.OnayZamaniTurleri) dosya adındaki zaman,
-    /// beyanname PDF'inin 1. sayfasındaki "Onay Zamanı"dır (okunamazsa yükleme zamanı). Dönen değer = kullanılan zaman.
+    /// Bir beyanname sürümünün arşivdeki durumu (§9.6).
+    /// <para><see cref="Eslesen"/>: arşivde aynı onay zamanlı beyanname PDF'i (adı ne olursa olsun) → bu sürüm var.</para>
+    /// <para><see cref="IcerikleYok"/>: arşivdeki aynı önekli tüm beyanname PDF'leri okundu, hiçbiri bu sürüm değil → kesin eksik.</para>
+    /// İkisi de değilse karar eski önek sayımıyla verilir (PDF okunamadı).
     /// </summary>
-    async Task<DateTime> BeyannameEvraklariAsync(BeyannameSatiri b, Musteri m, int sira, Action<Seviye, string, string?> bildir, CancellationToken ct)
+    sealed record SurumDurumu(DateTime Zaman, string? Eslesen, bool IcerikleYok);
+
+    readonly Dictionary<string, (DateTime Yazma, DateTime? Onay)> _arsivOnay = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Arşivdeki bir beyanname PDF'inin onay zamanı (önbellekli; okunamazsa null).</summary>
+    DateTime? ArsivOnay(string yol)
+    {
+        try
+        {
+            var yazma = File.GetLastWriteTimeUtc(yol);
+            if (_arsivOnay.TryGetValue(yol, out var o) && o.Yazma == yazma) return o.Onay;
+            var oz = BeyannamePdfOkuyucu.OnayZamani(File.ReadAllBytes(yol));
+            _arsivOnay[yol] = (yazma, oz);
+            return oz;
+        }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>"..._BEYANNAME_X" → "..._TAHAKKUK_X" (arşivdeki eşin tahakkuk/ihbarname karşılığı).</summary>
+    static string Karsilik(string beyannameAdi, string onekBeyanname, string onekHedef) =>
+        onekHedef + beyannameAdi[onekBeyanname.Length..];
+
+    /// <summary>
+    /// Beyanname + tahakkuk. KDV türlerinde (Ayarlar.OnayZamaniTurleri) dosya adındaki zaman,
+    /// beyanname PDF'inin 1. sayfasındaki "Onay Zamanı"dır (okunamazsa yükleme zamanı).
+    /// Arşivde aynı önekli dosya varsa sürüm PDF içeriğiyle (onay zamanı) tanınır: ofisin elle verdiği adlar
+    /// (_DÜZ, _DÜZ2, damgasız, XML adlı) GİB'deki sıra numarasıyla örtüşmeyebilir (2026-11-18'de 8 kopya buradan çıktı).
+    /// </summary>
+    async Task<SurumDurumu> BeyannameEvraklariAsync(BeyannameSatiri b, Musteri m, int sira, Action<Seviye, string, string?> bildir, CancellationToken ct)
     {
         var klasor = ArsivDenetci.BeyannameKlasoru(ayarlar.YArsivKok, m, b);
         var bOnek = DosyaAdlari.BeyannameOnek(b, EvrakTuru.Beyanname);
         var tOnek = DosyaAdlari.BeyannameOnek(b, EvrakTuru.Tahakkuk);
-        bool bVar = ArsivDenetci.VarMi(klasor, bOnek, DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Beyanname, sira), sira);
-        bool tVar = b.TahakkukOid is null || ArsivDenetci.VarMi(klasor, tOnek, DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Tahakkuk, sira), sira);
+        bool onayli = ayarlar.OnayZamaniKullanilir(b.Tur);
+        bool tamAd = File.Exists(Path.Combine(klasor, DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Beyanname, sira)));
+        var adaylar = ArsivDenetci.Dosyalar(klasor, bOnek).ToList();
 
         DateTime zaman = b.YuklemeZamani;
         byte[]? bynPdf = null;
-        bool onayli = ayarlar.OnayZamaniKullanilir(b.Tur);
+        string? eslesen = null;
+        bool icerikleYok = false;
+        bool onayOkundu = false;
 
-        // Onay zamanı gerekiyorsa ve bir şey indirilecekse beyanname PDF'i önce alınır (tahakkuk adı da ona bağlı)
-        if (onayli && !(bVar && tVar))
+        // Tam ad yoksa ve (arşivde aday var ya da ad onay zamanına bağlıysa) GİB'deki beyanname PDF'i alınır
+        if (!tamAd && (adaylar.Count > 0 || onayli))
         {
             bynPdf = await istemci.PdfAsync(EbynKomutlari.BeyannamePdf(b.Oid), ct);
-            if (BeyannamePdfOkuyucu.OnayZamani(bynPdf) is { } oz) zaman = oz;
-            else bildir(Seviye.Uyari, $"{m.KisaAd} {b.Tur} {b.Donem}: beyanname PDF'inde onay zamanı okunamadı, yükleme zamanı kullanıldı", null);
+            if (BeyannamePdfOkuyucu.OnayZamani(bynPdf) is { } oz)
+            {
+                onayOkundu = true;
+                if (onayli) zaman = oz;
+                var okunan = adaylar.Select(a => (Ad: a, Onay: ArsivOnay(Path.Combine(klasor, a + ".pdf")))).ToList();
+                eslesen = okunan.FirstOrDefault(x => x.Onay == oz).Ad;
+                icerikleYok = eslesen is null && okunan.All(x => x.Onay is not null);
+            }
+            else if (onayli)
+                bildir(Seviye.Uyari, $"{m.KisaAd} {b.Tur} {b.Donem}: beyanname PDF'inde onay zamanı okunamadı, yükleme zamanı kullanıldı", null);
         }
 
-        await TekEvrakAsync(klasor, bOnek, DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Beyanname, sira, zaman: zaman), sira,
-            () => bynPdf is not null ? Task.FromResult(bynPdf) : istemci.PdfAsync(EbynKomutlari.BeyannamePdf(b.Oid), ct), bildir);
+        var bAd = DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Beyanname, sira, zaman: zaman);
+        var tAd = DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Tahakkuk, sira, zaman: zaman);
+        bool? bVar, tVar;
+        if (tamAd) { bVar = true; tVar = null; }                       // eski davranış (tahakkuk da kendi tam adıyla/sayımla)
+        else if (eslesen is not null)
+        {
+            bVar = true;
+            // Eşin tahakkuku: aynı adın TAHAKKUK karşılığı; yoksa ve tahakkuk sayısı beyanname sayısına yetiyorsa var say
+            var tKarsilik = Karsilik(eslesen, bOnek, tOnek);
+            tVar = File.Exists(Path.Combine(klasor, tKarsilik + ".pdf")) || File.Exists(Path.Combine(klasor, tAd))
+                   || ArsivDenetci.EskiDosyaSayisi(klasor, tOnek) >= adaylar.Count;
+            if (tVar == false) tAd = tKarsilik + ".pdf";             // eksik tahakkuk, arşivdeki beyannamesiyle aynı adla
+            bildir(Seviye.Atlandi, $"zaten var (içerikten): {eslesen}.pdf", Path.Combine(klasor, eslesen + ".pdf"));
+        }
+        else if (icerikleYok || (onayOkundu && adaylar.Count == 0))
+        {
+            bVar = File.Exists(Path.Combine(klasor, bAd));
+            tVar = File.Exists(Path.Combine(klasor, tAd));
+        }
+        else { bVar = null; tVar = null; }                            // içerik okunamadı → önek sayımı
+
+        if (bVar != true || eslesen is null)
+            await TekEvrakAsync(klasor, bOnek, bAd, sira,
+                () => bynPdf is not null ? Task.FromResult(bynPdf) : istemci.PdfAsync(EbynKomutlari.BeyannamePdf(b.Oid), ct), bildir, bVar);
 
         if (b.TahakkukOid is { } t)
-            await TekEvrakAsync(klasor, tOnek, DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Tahakkuk, sira, zaman: zaman), sira,
-                () => istemci.PdfAsync(EbynKomutlari.TahakkukPdf(b.Oid, t), ct), bildir);
-        return zaman;
+            await TekEvrakAsync(klasor, tOnek, tAd, sira, () => istemci.PdfAsync(EbynKomutlari.TahakkukPdf(b.Oid, t), ct), bildir, tVar);
+        return new SurumDurumu(zaman, eslesen, icerikleYok);
     }
 
-    async Task IhbarnamelerAsync(BeyannameSatiri b, Musteri m, int sira, DateTime zaman, Action<Seviye, string, string?> bildir, CancellationToken ct)
+    async Task IhbarnamelerAsync(BeyannameSatiri b, Musteri m, int sira, SurumDurumu surum, Action<Seviye, string, string?> bildir, CancellationToken ct)
     {
         var klasor = ArsivDenetci.BeyannameKlasoru(ayarlar.YArsivKok, m, b);
         var anahtar = TamamlananDeposu.Anahtar(ayarlar, b.Oid, "IHB");
         if (_tamamlanan.Var(anahtar)) return;
+        var onek1 = DosyaAdlari.BeyannameOnek(b, EvrakTuru.Ihbarname, 1);
+        var ad1 = DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Ihbarname, sira, 1, surum.Zaman);
+        bool? ilkVar = null;
+        if (surum.Eslesen is not null)
+        {
+            // Sürüm arşivde başka adla var → ihbarnamesi de o adın karşılığıyla aranır; yoksa sayıma bakılır
+            var karsilik = Karsilik(surum.Eslesen, DosyaAdlari.BeyannameOnek(b, EvrakTuru.Beyanname), onek1);
+            ilkVar = File.Exists(Path.Combine(klasor, karsilik + ".pdf")) || File.Exists(Path.Combine(klasor, ad1))
+                     || ArsivDenetci.EskiDosyaSayisi(klasor, onek1) > 0;
+        }
+        else if (surum.IcerikleYok) ilkVar = File.Exists(Path.Combine(klasor, ad1));
         // İlk ihbarname zaten varsa listeyi sorgulamaya gerek yok
-        if (ArsivDenetci.VarMi(klasor, DosyaAdlari.BeyannameOnek(b, EvrakTuru.Ihbarname, 1),
-                DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Ihbarname, sira, 1, zaman), sira))
-            return;
+        if (ilkVar ?? ArsivDenetci.VarMi(klasor, onek1, ad1, sira)) { _tamamlanan.Ekle(anahtar); return; }
 
         var liste = await istemci.IhbarnamelerAsync(b.Oid, ct);
         for (int i = 0; i < liste.Count; i++)
         {
             var ih = liste[i];
-            await TekEvrakAsync(klasor, DosyaAdlari.BeyannameOnek(b, EvrakTuru.Ihbarname, i + 1),
-                DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Ihbarname, sira, i + 1, zaman), sira,
-                () => istemci.PdfAsync(EbynKomutlari.IhbarnamePdf(ih), ct), bildir);
+            var ad = DosyaAdlari.BeyannameDosyasi(b, EvrakTuru.Ihbarname, sira, i + 1, surum.Zaman);
+            await TekEvrakAsync(klasor, DosyaAdlari.BeyannameOnek(b, EvrakTuru.Ihbarname, i + 1), ad, sira,
+                () => istemci.PdfAsync(EbynKomutlari.IhbarnamePdf(ih), ct), bildir,
+                surum.IcerikleYok || surum.Eslesen is not null ? File.Exists(Path.Combine(klasor, ad)) : null);
         }
         // Buraya hatasız gelindiyse tüm ihbarnameler arşivde (hata olsaydı istisna yukarı çıkardı)
         _tamamlanan.Ekle(anahtar);
@@ -267,10 +345,12 @@ public sealed class Indirici(
         return secim;
     }
 
-    static async Task TekEvrakAsync(string klasor, string onek, string ad, int sira, Func<Task<byte[]>> indir, Action<Seviye, string, string?> bildir)
+    /// <param name="varMi">Verilirse "arşivde var mı" kararı (içerikten); verilmezse tam ad / önek sayımı (ArsivDenetci.VarMi).</param>
+    static async Task TekEvrakAsync(string klasor, string onek, string ad, int sira, Func<Task<byte[]>> indir, Action<Seviye, string, string?> bildir,
+        bool? varMi = null)
     {
         var hedef = Path.Combine(klasor, ad);
-        if (ArsivDenetci.VarMi(klasor, onek, ad, sira))
+        if (varMi ?? ArsivDenetci.VarMi(klasor, onek, ad, sira))
         {
             // KDV'de onay zamanı PDF indirilmeden bilinmez → ad yükleme zamanlı olabilir; o zaman yalnız öneki göster
             bildir(Seviye.Atlandi, File.Exists(hedef) ? $"zaten var: {ad}" : $"zaten var: {onek}_… (arşivdeki adla)", hedef);

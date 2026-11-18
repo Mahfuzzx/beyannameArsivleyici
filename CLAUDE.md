@@ -93,6 +93,9 @@ Bugün yapılanlar:
   gerçek X/Y arşiviyle SGK dahil tüm adlar tanındı. 3+ yıllık yükleme aralığı henüz denenmedi.
 - **Gerçek arşive bağlandı** (ayarlar: `Y:\`, `X:\`; test klasörlü ayarların yedeği `ayarlar.test-klasorleri.json`). İlk tur: 157 indirildi,
   0 hata, yeni klasör yok, düzeltme sıraları doğru (§12.4). Aynı gün 890 PDF kısıtlamasız indi → kota tahmini ~850 yanlış (§12.3).
+- **Kopya olayı ve yeni kural (§9.6):** gerçek arşivde 16 kopya (8 düzeltme beyannamesi + tahakkukları) indi; kullanıcı onayıyla
+  `_KOPYA` alt klasörlerine taşındı (silinmedi). Düzeltme sürümleri artık beyanname PDF'indeki **onay zamanıyla** tanınıyor
+  (`Indirici.BeyannameEvraklariAsync`), tamamlanan satırlar "SATIR" anahtarıyla önbellekte. ~4 yıllık yükleme aralığını GİB kabul etti.
 - Durum çubuğuna ilerleme çubuğu eklendi (listeleme: ay dilimi; müşteri taraması: müşteri × tür; indirme: beyanname satırı; kalan süre tahmini).
 - Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).

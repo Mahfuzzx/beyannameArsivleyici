@@ -73,7 +73,7 @@ public class TamamlananTestleri : IDisposable
         // diske yazılıp açılınca da geçerli
         var dosya = Path.Combine(_k, "tamamlanan.json");
         d.Kaydet(dosya);
-        Assert.Equal(1, TamamlananDeposu.Ac(dosya).Sayi);
+        Assert.Equal(2, TamamlananDeposu.Ac(dosya).Sayi); // SGK + SATIR
     }
 
     [Fact]

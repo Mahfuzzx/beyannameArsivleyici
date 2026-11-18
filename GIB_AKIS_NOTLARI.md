@@ -226,6 +226,26 @@ X:\{YIL}\{MÜKELLEF_KLASÖRÜ_TR}\{İŞYERİ}\{dosya}.pdf
 - SGDP bildirim açıklaması: `Asıl, SOS.GÜV.DES PRİM BİLDİRGE, Kanun türü yoktur, 09 / 2025, {sicil}, Yasal süresinde verilme` →
   `SgkAdParcalari` artık bunu 02 tanıyor (ön kontrol); kesin karar yine PDF'ten.
 
+### 9.6 Düzeltme sürümleri PDF içeriğiyle tanınır (2026-11-18, gerçek arşivde kopya bulunduktan sonra)
+- **Olay:** gerçek arşivde 1 müşteri için 01/2023–11/2026 müşteri taraması (~4 yıllık yükleme aralığını GİB kabul etti, 277 beyanname,
+  104 PDF; ~900. PDF civarında 5 kez kısa kısıtlama, 2 dk beklemelerle aşıldı). Ardından 11:10'daki turla birlikte inen dosyalar arşivdeki
+  eşleriyle **beyanname PDF'indeki onay zamanı** üzerinden karşılaştırıldı: **8 beyanname (+ 8 tahakkuk) kopya**, 79 beyanname gerçekten yeni
+  (2023'te arşivde hiç olmayan aylar, eksik düzeltmeler).
+- **Neden:** ofis düzeltmelerin hepsini kaydetmemiş, kaydettiklerine elle `_DÜZ`, `_DÜZ2` (ya da XML dosya adı, damgasız ad) vermiş.
+  Örn. GİB'de v1 v2 v3 v4, arşivde `…BEYANNAME_25.01.2024…` (v1), `_DÜZ` (v2), `_DÜZ2` (= v4!). Önek sayımı "3 dosya var → 4. sürüm eksik"
+  diyerek v4'ü `_DÜZ3` adıyla bir daha indirdi. Tersi de mümkündü (eksik sürüm "var" sanılabilirdi).
+- **Kopyalar:** silinmedi; kullanıcı onayıyla her biri kendi klasöründeki `_KOPYA` alt klasörüne taşındı (16 dosya; liste
+  `%APPDATA%\GibEvrakIndirici\log\kopyalar_2026-11-18.txt`, repoda değil). Program alt klasörlere bakmaz.
+- **Yeni kural (`Indirici.BeyannameEvraklariAsync`):** tam ad yoksa ve klasörde aynı önekli dosya varsa GİB'den beyanname PDF'i alınır,
+  onay zamanı okunur, arşivdeki aynı önekli her beyanname PDF'inin onay zamanıyla (önbellekli) karşılaştırılır:
+  - eşleşen var → sürüm var (adı ne olursa olsun). Tahakkuk: eşin `TAHAKKUK` karşılığı ya da tahakkuk sayısı ≥ beyanname sayısı ise var;
+    yoksa eşin adıyla indirilir (çift düzgün kalır). İhbarname de eşin karşılığıyla aranır.
+  - hepsi okundu, eşleşen yok → sürüm kesin eksik → yalnız tam adla bakılır, indirilir.
+  - bir PDF okunamadıysa → eski önek sayımı (yedek).
+- **Maliyet:** adı farklı her sürüm için bir kez 1 beyanname PDF isteği. Satırın tüm evrakı doğrulanınca `tamamlanan.json`'a "SATIR"
+  yazılır; sonraki çalıştırmalarda o satır için GİB'e hiç istek gitmez.
+- Tablodaki ✓/eksik gösterimi (`Indirici.Durum`) hâlâ önek sayımıyla (yalnız görüntü; indirme kararı yeni kuralla).
+
 ## 10. Eski program: Luca Entegrasyon (C:\LucaEntegrasyon) — inceleme
 - Java 11 masaüstü (Swing/SWT), `LucaEntegrasyon.jar` (Agem/Luca), başlatma `lucaentegrasyon.bat`.
 - Ayar: `LucaBeyanname.xml` → `filePath = \\SUNUCU\beyannameler\LUCA` (= Y:\), dönem seçimi, GİB ve Luca giriş bilgileri.
@@ -339,8 +359,8 @@ Luca'da tüm firmaların işyerlerini sicil no ile birlikte veren tek ekran YOK;
 ### 12.4 Gerçek arşive ilk bağlantı (2026-11-18 11:10, bu birim, son 31 gün)
 - 362 beyanname: 157 indirildi, 227 zaten var, 0 hata, 211 filtre dışı. Diske yazılan 157 = log'daki 157; **hiç yeni klasör açılmadı**.
 - İnenler: 72 Ekim MUHSGK (beyanname + tahakkuk), 80 SGK PDF (X:\ var olan işyeri klasörlerine: MERKEZ 70, diğer 5 işyeri 2'şer),
-  5 düzeltme: 2024 Mayıs KDV1 `_DÜZ` (beyanname, tahakkuk, ihbarname; arşivde yalnız asıl vardı) ve 2026 Eylül KDV1 `_DÜZ2`
-  (arşivde asıl + elle `_DÜZ` vardı → sıra doğru).
+  5 düzeltme: 2024 Mayıs KDV1 `_DÜZ` (beyanname, tahakkuk, ihbarname; arşivde yalnız asıl vardı) ve 2026 Eylül KDV1 `_DÜZ2`.
+  **Düzeltme (aynı gün, §9.6):** Eylül `_DÜZ2` aslında KOPYA çıktı — arşivdeki elle `_DÜZ` dosyası GİB'deki 3. sürümün kendisiydi.
 
 ## 13. e-Beyan (ebeyan.gib.gov.tr) incelemesi (2026-11-16)
 - Geçiş: DVD › Geçiş Yapılabilecek Uygulamalar › e-Beyan → onay penceresi ("aktif e-Beyan oturumları sonlandırılır") →
