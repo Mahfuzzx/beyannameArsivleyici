@@ -40,6 +40,8 @@ sealed class AnaForm : Form
     readonly ListBox _log = new() { Dock = DockStyle.Bottom, Height = 160, HorizontalScrollbar = true, IntegralHeight = false };
     readonly ToolStripStatusLabel _durum = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     readonly ToolStripStatusLabel _oturum = new() { Text = "GİB: kapalı", ForeColor = Color.Firebrick };
+    readonly ToolStripProgressBar _ilerleme = new() { Size = new Size(260, 16), Visible = false };
+    readonly ToolStripStatusLabel _ilerlemeYazi = new() { Visible = false };
     readonly DateTimePicker _bas = new() { Format = DateTimePickerFormat.Short, Width = 100 };
     readonly DateTimePicker _bit = new() { Format = DateTimePickerFormat.Short, Width = 100 };
     readonly CheckBox _sadeceEksik = new() { Text = "Sadece eksikler", Checked = true, AutoSize = true };
@@ -113,7 +115,7 @@ sealed class AnaForm : Form
         };
 
         var durumCubugu = new StatusStrip();
-        durumCubugu.Items.AddRange([_oturum, _durum]);
+        durumCubugu.Items.AddRange([_oturum, _durum, _ilerlemeYazi, _ilerleme]);
 
         Controls.Add(_sekmeler);
         Controls.Add(durumCubugu);
@@ -213,16 +215,53 @@ sealed class AnaForm : Form
         finally
         {
             TamamlananKaydet();
+            IlerlemeyiGizle();
             _iptal.Dispose(); _iptal = null;
             foreach (var b in _isDugmeleri) b.Enabled = true;
             _durdur.Enabled = false;
         }
     }
 
+    /// <summary>
+    /// İlerleme çubuğu: (biten, toplam) bildirimi alır; çubuğun yanında aşama, sayı, yüzde ve kalan süre tahmini yazar.
+    /// Her çağrı yeni bir aşama başlatır (süre tahmini o aşamanın başından hesaplanır).
+    /// </summary>
+    IProgress<(int Biten, int Toplam)> Oran(string asama)
+    {
+        var basla = DateTime.Now;
+        return new Progress<(int Biten, int Toplam)>(o =>
+        {
+            _ilerleme.Visible = _ilerlemeYazi.Visible = true;
+            if (o.Toplam <= 0)
+            {
+                _ilerleme.Style = ProgressBarStyle.Marquee;
+                _ilerlemeYazi.Text = asama;
+                return;
+            }
+            _ilerleme.Style = ProgressBarStyle.Continuous;
+            _ilerleme.Maximum = o.Toplam;
+            _ilerleme.Value = Math.Clamp(o.Biten, 0, o.Toplam);
+            var yazi = $"{asama}: {o.Biten}/{o.Toplam} (%{o.Biten * 100 / o.Toplam})";
+            var gecen = DateTime.Now - basla;
+            if (o.Biten > 0 && o.Biten < o.Toplam && gecen > TimeSpan.FromSeconds(5))
+            {
+                var kalan = TimeSpan.FromSeconds(gecen.TotalSeconds / o.Biten * (o.Toplam - o.Biten));
+                yazi += kalan.TotalMinutes >= 1 ? $" — ~{Math.Ceiling(kalan.TotalMinutes)} dk kaldı" : $" — ~{Math.Ceiling(kalan.TotalSeconds)} sn kaldı";
+            }
+            _ilerlemeYazi.Text = yazi;
+        });
+    }
+
+    void IlerlemeyiGizle()
+    {
+        _ilerleme.Visible = _ilerlemeYazi.Visible = false;
+        _ilerleme.Value = 0;
+    }
+
     Task ListeleAsync(DateTime bas, DateTime bit) => IsCalistirAsync("Listeleme", async ct =>
     {
         var ilerleme = new Progress<string>(Durum);
-        _satirlar = await Istemci().OnayliBeyannamelerAsync(bas, bit, ilerleme, ct);
+        _satirlar = await Istemci().OnayliBeyannamelerAsync(bas, bit, ilerleme, ct, Oran("Listeleniyor (ay)"));
         Log(Seviye.Bilgi, $"{bas:dd.MM.yyyy}–{bit:dd.MM.yyyy}: {_satirlar.Count} onaylı beyanname listelendi.");
         TabloyuDoldur();
     });
@@ -231,7 +270,7 @@ sealed class AnaForm : Form
     {
         if (_satirlar.Count == 0) { Log(Seviye.Bilgi, "İndirilecek satır yok."); return; }
         var ilerleme = new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); });
-        var ozet = await Indirici().CalistirAsync(_satirlar, ilerleme, ct);
+        var ozet = await Indirici().CalistirAsync(_satirlar, ilerleme, ct, Oran("İndiriliyor (beyanname)"));
         TabloyuDoldur();
         var metin = $"{(ozet.Durduruldu ? "Yarıda kesildi (GİB kısıtlaması)" : "Bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}" + (ozet.FiltreDisi > 0 ? $", filtre dışı: {ozet.FiltreDisi}" : "");
         Log(Seviye.Bilgi, metin); Durum(metin);
@@ -242,9 +281,9 @@ sealed class AnaForm : Form
     {
         var bas = new DateTime(DateTime.Today.Year - Math.Max(1, _ayarlar.TaramaYilSayisi) + 1, 1, 1);
         Log(Seviye.Bilgi, $"Arşiv taraması: {bas:dd.MM.yyyy}–{DateTime.Today:dd.MM.yyyy}");
-        _satirlar = await Istemci().OnayliBeyannamelerAsync(bas, DateTime.Today, new Progress<string>(Durum), ct);
+        _satirlar = await Istemci().OnayliBeyannamelerAsync(bas, DateTime.Today, new Progress<string>(Durum), ct, Oran("Listeleniyor (ay)"));
         TabloyuDoldur();
-        var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct);
+        var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct, Oran("İndiriliyor (beyanname)"));
         TabloyuDoldur();
         Log(Seviye.Bilgi, $"Arşiv taraması {(ozet.Durduruldu ? "yarıda kesildi (GİB kısıtlaması)" : "bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}" + (ozet.FiltreDisi > 0 ? $", filtre dışı: {ozet.FiltreDisi}" : ""));
     });
@@ -257,11 +296,20 @@ sealed class AnaForm : Form
         var istemci = Istemci();
         var ilerleme = new Progress<string>(Durum);
         var satirlar = new List<BeyannameSatiri>();
+        var oran = Oran("Listeleniyor (müşteri × tür)");
+        int toplamSorgu = istek.Musteriler.Count * istek.Turler.Count, bitenSorgu = 0;
+        oran.Report((0, toplamSorgu));
         foreach (var m in istek.Musteriler)
         {
             ct.ThrowIfCancellationRequested();
-            if (MusteriTaramasi.Kimlik(m) is not { } kimlik) { Log(Seviye.Uyari, $"{m.KisaAd}: VKN/TCKN yok, atlandı"); continue; }
-            var l = await istemci.MukellefBeyannameleriAsync(kimlik, istek.Turler, istek.Aralik, DateTime.Today, ilerleme, ct);
+            if (MusteriTaramasi.Kimlik(m) is not { } kimlik)
+            {
+                Log(Seviye.Uyari, $"{m.KisaAd}: VKN/TCKN yok, atlandı");
+                bitenSorgu += istek.Turler.Count; oran.Report((bitenSorgu, toplamSorgu));
+                continue;
+            }
+            var l = await istemci.MukellefBeyannameleriAsync(kimlik, istek.Turler, istek.Aralik, DateTime.Today, ilerleme, ct,
+                turBitti: () => oran.Report((++bitenSorgu, toplamSorgu)));
             Log(Seviye.Bilgi, $"{m.KisaAd}: {l.Count} onaylı beyanname");
             satirlar.AddRange(l);
         }
@@ -269,7 +317,7 @@ sealed class AnaForm : Form
         TabloyuDoldur();
         Log(Seviye.Bilgi, $"Müşteri taraması listelendi: {_satirlar.Count} beyanname." + (indir ? "" : " İndirmek için \"Eksikleri indir\"."));
         if (!indir) return;
-        var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct);
+        var ozet = await Indirici().CalistirAsync(_satirlar, new Progress<IndirmeOlayi>(o => { Log(o.Seviye, o.Mesaj); Durum(o.Mesaj); }), ct, Oran("İndiriliyor (beyanname)"));
         TabloyuDoldur();
         Log(Seviye.Bilgi, $"Müşteri taraması {(ozet.Durduruldu ? "yarıda kesildi (GİB kısıtlaması)" : "bitti")} — indirilen: {ozet.Indirilen}, zaten var: {ozet.Atlanan}, uyarı: {ozet.Uyari}, hata: {ozet.Hata}");
     });

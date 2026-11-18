@@ -91,6 +91,9 @@ Bugün yapılanlar:
 - "Müşteri taraması" sekmesi eklendi (`MusteriTaramaSekmesi`, `EbynIstemci.MukellefBeyannameleriAsync`, §9.5): seçili müşteriler ×
   türler × vergilendirme dönemi aralığı. Canlı denendi (§9.5): 1 müşteri 01/2025–11/2026 → 101 beyanname, 262 PDF, 0 hata;
   gerçek X/Y arşiviyle SGK dahil tüm adlar tanındı. 3+ yıllık yükleme aralığı henüz denenmedi.
+- **Gerçek arşive bağlandı** (ayarlar: `Y:\`, `X:\`; test klasörlü ayarların yedeği `ayarlar.test-klasorleri.json`). İlk tur: 157 indirildi,
+  0 hata, yeni klasör yok, düzeltme sıraları doğru (§12.4). Aynı gün 890 PDF kısıtlamasız indi → kota tahmini ~850 yanlış (§12.3).
+- Durum çubuğuna ilerleme çubuğu eklendi (listeleme: ay dilimi; müşteri taraması: müşteri × tür; indirme: beyanname satırı; kalan süre tahmini).
 - Günlük bütçe / öncelik planı hâlâ **uygulanmadı** (kullanıcı onayı bekliyor).
 - `GercekDuzeltmeRaporu` testi: D:\dev\y + Y:\ varken yeni kuralla düzeltme sayılanları listeler (çıktı müşteri klasör adı içermez; dosya adı içerir — paylaşma).
 

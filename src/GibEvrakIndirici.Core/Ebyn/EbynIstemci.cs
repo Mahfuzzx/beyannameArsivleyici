@@ -1,4 +1,4 @@
-namespace GibEvrakIndirici.Core.Ebyn;
+﻿namespace GibEvrakIndirici.Core.Ebyn;
 
 /// <summary>
 /// e-Beyanname oturumuna istek taşıyan katman. TOKEN sayfada (getTOKEN/setTOKEN) tutulduğu için
@@ -85,10 +85,15 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
     public static bool PdfMi(byte[] b) => b.Length > 5 && b[0] == '%' && b[1] == 'P' && b[2] == 'D' && b[3] == 'F' && b[4] == '-';
 
     /// <summary>Yükleme tarihi aralığındaki tüm onaylı beyannameler (aylık dilim + tüm sayfalar).</summary>
-    public async Task<List<BeyannameSatiri>> OnayliBeyannamelerAsync(DateTime bas, DateTime bit, IProgress<string>? ilerleme, CancellationToken ct)
+    /// <param name="oran">(biten, toplam) aylık dilim — ilerleme çubuğu için.</param>
+    public async Task<List<BeyannameSatiri>> OnayliBeyannamelerAsync(DateTime bas, DateTime bit, IProgress<string>? ilerleme, CancellationToken ct,
+        IProgress<(int Biten, int Toplam)>? oran = null)
     {
         var sonuc = new List<BeyannameSatiri>();
-        foreach (var (b, s) in EbynKomutlari.AylikDilimler(bas, bit))
+        var dilimler = EbynKomutlari.AylikDilimler(bas, bit).ToList();
+        int bitenDilim = 0;
+        oran?.Report((0, dilimler.Count));
+        foreach (var (b, s) in dilimler)
         {
             int sayfa = 1, sayfaSayisi = 1;
             do
@@ -105,6 +110,7 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
                 sayfaSayisi = l.SayfaSayisi;
                 sayfa++;
             } while (sayfa <= sayfaSayisi);
+            oran?.Report((++bitenDilim, dilimler.Count));
         }
         // Aynı OID iki dilimde gelmesin
         return sonuc.GroupBy(x => x.Oid).Select(g => g.First()).ToList();
@@ -116,7 +122,7 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
     /// Sonuç, başlangıç ayı aralık içinde kalan dönemlerle sınırlanır.
     /// </summary>
     public async Task<List<BeyannameSatiri>> MukellefBeyannameleriAsync(string vknTckn, IEnumerable<string> turler, Donem aralik,
-        DateTime bugun, IProgress<string>? ilerleme, CancellationToken ct)
+        DateTime bugun, IProgress<string>? ilerleme, CancellationToken ct, Action? turBitti = null)
     {
         var sonuc = new List<BeyannameSatiri>();
         var yukBas = new DateTime(aralik.BasYil, aralik.BasAy, 1);
@@ -138,6 +144,7 @@ public sealed class EbynIstemci(IEbynTasiyici tasiyici, TimeProvider? zaman = nu
                 sayfaSayisi = l.SayfaSayisi;
                 sayfa++;
             } while (sayfa <= sayfaSayisi);
+            turBitti?.Invoke();
         }
         return sonuc.GroupBy(x => x.Oid).Select(g => g.First()).ToList();
     }

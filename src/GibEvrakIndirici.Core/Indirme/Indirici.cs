@@ -1,4 +1,4 @@
-using GibEvrakIndirici.Core.Adlandirma;
+﻿using GibEvrakIndirici.Core.Adlandirma;
 using GibEvrakIndirici.Core.Arsiv;
 using GibEvrakIndirici.Core.Ebyn;
 using GibEvrakIndirici.Core.Musteriler;
@@ -63,8 +63,12 @@ public sealed class Indirici(
         return new SatirDurumu(m, Var(EvrakTuru.Beyanname), b.TahakkukOid is null ? null : Var(EvrakTuru.Tahakkuk), duzeltmeSira);
     }
 
-    public async Task<IndirmeOzeti> CalistirAsync(IReadOnlyList<BeyannameSatiri> satirlar, IProgress<IndirmeOlayi> ilerleme, CancellationToken ct)
+    /// <param name="oran">(işlenen satır, toplam satır) — ilerleme çubuğu için.</param>
+    public async Task<IndirmeOzeti> CalistirAsync(IReadOnlyList<BeyannameSatiri> satirlar, IProgress<IndirmeOlayi> ilerleme, CancellationToken ct,
+        IProgress<(int Biten, int Toplam)>? oran = null)
     {
+        int biten = 0;
+        oran?.Report((0, satirlar.Count));
         var ozet = new IndirmeOzeti();
         var siralar = DuzeltmeSiralayici.Sirala(satirlar);
 
@@ -83,6 +87,7 @@ public sealed class Indirici(
         foreach (var b in satirlar.OrderBy(x => x.YuklemeZamani))
         {
             ct.ThrowIfCancellationRequested();
+            oran?.Report((biten++, satirlar.Count));
             var m = musteriler.Bul(b.VknTckn);
             if (m is null)
             {
@@ -124,6 +129,7 @@ public sealed class Indirici(
                 }
             }
         }
+        oran?.Report((satirlar.Count, satirlar.Count));
         return ozet;
     }
 

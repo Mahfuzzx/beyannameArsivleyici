@@ -333,6 +333,14 @@ Luca'da tüm firmaların işyerlerini sicil no ile birlikte veren tek ekran YOK;
   elle verilmiş tarihli/damgasız adlar → gerçek arşivde "var" sayılır). Ekim MUHSGK + SGK arşivde henüz yok.
 - SGK bildirim listesinde MUHSGK'nın vergi kısmı "Vergi" satırı olarak geliyor, PDF'i hiç olmaz → 70 gereksiz uyarı; artık sessizce atlanıyor.
 - Liste (POST) isteklerinde de "İki istek arası en az 1 sn olabilir" hatası görüldü → 1 sn kuralı yalnız görüntülemede değil; bekleme tüm isteklerde kalmalı.
+- Aynı gün toplam **890 PDF** (09:26 471 + 10:55 262 + 11:10 157) hiç kısıtlama olmadan indi → "~850/gün" tahmini **tutmadı**.
+  16.11'deki engel 846. indirmede gelmişti ama o gün öncesinde keşif amaçlı elle çok sayıda görüntüleme de yapılmıştı. Sınır bilinmiyor (≥890/gün).
+
+### 12.4 Gerçek arşive ilk bağlantı (2026-11-18 11:10, bu birim, son 31 gün)
+- 362 beyanname: 157 indirildi, 227 zaten var, 0 hata, 211 filtre dışı. Diske yazılan 157 = log'daki 157; **hiç yeni klasör açılmadı**.
+- İnenler: 72 Ekim MUHSGK (beyanname + tahakkuk), 80 SGK PDF (X:\ var olan işyeri klasörlerine: MERKEZ 70, diğer 5 işyeri 2'şer),
+  5 düzeltme: 2024 Mayıs KDV1 `_DÜZ` (beyanname, tahakkuk, ihbarname; arşivde yalnız asıl vardı) ve 2026 Eylül KDV1 `_DÜZ2`
+  (arşivde asıl + elle `_DÜZ` vardı → sıra doğru).
 
 ## 13. e-Beyan (ebeyan.gib.gov.tr) incelemesi (2026-11-16)
 - Geçiş: DVD › Geçiş Yapılabilecek Uygulamalar › e-Beyan → onay penceresi ("aktif e-Beyan oturumları sonlandırılır") →
