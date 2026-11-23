@@ -46,7 +46,8 @@ sealed class AnaForm : Form
     readonly ToolStripStatusLabel _ilerlemeYazi = new() { Visible = false };
     readonly DateTimePicker _bas = new() { Format = DateTimePickerFormat.Short, Width = 100 };
     readonly DateTimePicker _bit = new() { Format = DateTimePickerFormat.Short, Width = 100 };
-    readonly CheckBox _sadeceEksik = new() { Text = "Sadece eksikler", Checked = true, AutoSize = true };
+    readonly RadioButton _hepsiniGoster = new() { Text = "Hepsini göster", AutoSize = true };
+    readonly RadioButton _sadeceEksik = new() { Text = "Eksikleri göster", Checked = true, AutoSize = true };
     readonly List<Button> _isDugmeleri = [];
     Button _durdur = null!;
 
@@ -77,8 +78,12 @@ sealed class AnaForm : Form
         _durdur = Dugme("Durdur", () => { _iptal?.Cancel(); return Task.CompletedTask; });
         _durdur.Enabled = false;
         ust.Controls.Add(_durdur);
-        _sadeceEksik.Margin = new Padding(12, 8, 3, 3);
-        _sadeceEksik.CheckedChanged += (_, _) => TabloyuDoldur();
+        _hepsiniGoster.Margin = new Padding(12, 8, 3, 3);
+        _sadeceEksik.Margin = new Padding(3, 8, 3, 3);
+        // İki seçenek aynı panelde olduğundan birbirini dışlar; yalnız seçilen tarafta tabloyu yenile.
+        _hepsiniGoster.CheckedChanged += (_, _) => { if (_hepsiniGoster.Checked) TabloyuDoldur(); };
+        _sadeceEksik.CheckedChanged += (_, _) => { if (_sadeceEksik.Checked) TabloyuDoldur(); };
+        ust.Controls.Add(_hepsiniGoster);
         ust.Controls.Add(_sadeceEksik);
         ust.Controls.Add(new Label { Width = 20 });
         ust.Controls.Add(Dugme("Müşteri Excel'i al", async () => await MusteriExceliAlAsync(), isDugmesi: true));
